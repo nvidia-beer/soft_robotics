@@ -1,0 +1,43 @@
+{
+    "name": "openai-gym-dev",
+    "containerUser": "root",
+    "build": {
+      "dockerfile": "Dockerfile",
+      "context": ".."
+    },
+    "containerEnv": {
+      "DISPLAY": "${localEnv:DISPLAY}"
+    },
+    "runArgs": [
+      "--gpus", "all",
+      "--shm-size=16g",
+      "--network=host",
+      "--privileged",
+      "--ipc=host",
+      "-v", "/tmp/.X11-unix:/tmp/.X11-unix",
+      "--ulimit", "memlock=-1",
+      "--ulimit", "stack=67108864",
+      "-p", "8080:8080"
+    ],
+    "initializeCommand": "ls",
+    "postCreateCommand": "pip install -e . && python -c 'import warp as wp; wp.init(); print(\"✓ Warp initialized:\", wp.get_devices())' && echo '✓ MPC, Box2D, and Warp environments ready!'",
+    "customizations": {
+      "vscode": {
+        "extensions": [
+          "ms-vscode.cpptools",
+          "ms-python.python",
+          "ms-python.vscode-pylance",
+          "ms-toolsai.jupyter",
+          "ms-toolsai.jupyter-keymap",
+          "ms-toolsai.jupyter-renderers",
+          "vscode-icons-team.vscode-icons",
+          "ms-python.black-formatter",
+          "ms-toolsai.vscode-jupyter-cell-tags",
+          "ms-toolsai.vscode-jupyter-slideshow",
+          "ExecutableBookProject.myst-highlight",
+          "ms-python.debugpy"
+        ]
+      }
+    }
+  }
+  
