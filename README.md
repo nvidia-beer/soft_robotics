@@ -1,90 +1,123 @@
-# MPC for Spring-Mass System
+# Soft Robotics Simulation Framework
 
-A Python implementation of Model Predictive Control (MPC) for a nonlinear spring-mass system.
+GPU-accelerated soft robot simulation with Spiking Neural Network (SNN) control using [NVIDIA Warp](https://github.com/NVIDIA/warp) and [Nengo](https://www.nengo.ai/).
 
-## System Description
+## Overview
 
-The system consists of `M` masses connected by springs with velocity-dependent friction. Control forces `u1` and `u2` are applied to the first and last masses to stabilize the system.
+This framework combines:
+- **FEM Physics**: Implicit integration with Neo-Hookean hyperelastic materials
+- **SNN Control**: Central Pattern Generators (CPG) with PES learning via Nengo
+- **SDF Terrain**: Procedural signed distance field environments
+- **GPU Acceleration**: NVIDIA Warp kernels for real-time simulation
 
-```
-|   k     _______    k     _______         k     _______    k    |
-|__/\/\__|       |__/\/\__|       |_ ... _/\/\__|       |__/\/\__|
-|        |  m_1  |        |  m_2  |             |  m_M  |        |
-|  u1 -->|_______|        |_______|             |_______|--> u2  |
-```
+## Modules
 
-### System Dynamics
+| Module | Description |
+|--------|-------------|
+| `rl_control/` | Locomotion demos with SDF terrain (slant, tunnel, boulder) |
+| `rl_locomotion/` | CPG controllers - rate-coded and spiking (Nengo) |
+| `trajectory_tracking/` | MPC + SNN adaptation for trajectory following |
+| `warp/` | GPU physics solvers (implicit FEM, semi-implicit) |
+| `world_map/` | SDF terrain generation and collision |
+| `pygame_renderer/` | Real-time visualization |
+| `tessellation/` | Delaunay mesh generation |
+| `openai-gym/` | OpenAI Gym environment wrapper |
 
-```
-m*x_i'' + 2*c*x_i' + h(x_i - x_{i-1}) + h(x_i - x_{i+1}) = 0
-```
+## Quick Start
 
-where `h(r) = k*r` for linear springs or `h(r) = k*r - k_nl*r^3` for nonlinear springs.
-
-## Installation
-
+### Build Docker Image
 ```bash
-pip install -r requirements.txt
+./build.sh
 ```
 
-## Usage
+### Run Locomotion Demos
+```bash
+cd rl_control
+./run.sh          # Interactive menu
 
-```python
-from soft_mpc import SpringMassMPC
-import numpy as np
-
-# Create MPC controller
-mpc = SpringMassMPC(
-    M=5,           # 5 masses
-    m=1.0,         # Mass (kg)
-    k=5.0,         # Spring stiffness
-    c=0.1,         # Friction coefficient
-    u_max=5.0,     # Max control force
-    dt=0.1,        # Time step
-    N=50           # Prediction horizon
-)
-
-# Initial conditions
-x0 = np.array([1.0, -0.5, 0.5, -0.3, 0.2])
-v0 = np.zeros(5)
-
-# Run control loop
-for i in range(100):
-    x_next, v_next, u_applied, x_pred = mpc.step(x0, v0)
-    x0, v0 = x_next, v_next
+# Or run directly
+python demo_slant.py --angle 45
+python demo_tunnel.py --tunnel-ratio 0.8
+python demo_boulder.py --boulder-ratio 0.5
 ```
 
-## Parameters
+### Run Trajectory Tracking
+```bash
+cd trajectory_tracking
+./run.sh
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `M` | Number of masses | 7 |
-| `m` | Mass of each element (kg) | 1.0 |
-| `k` | Spring stiffness | 5.0 |
-| `c` | Friction coefficient | 0.1 |
-| `u_max` | Maximum control force | 5.0 |
-| `dt` | Time step (s) | 0.1 |
-| `N` | Prediction horizon | 100 |
-| `Q` | Control weight | 1.0 |
-| `R` | Position weight | 50.0 |
-
-## MPC Formulation
-
-**Objective:**
-```
-minimize: R * ||x||_1 + Q * ||u||_1
+# Compare MPC vs MPC+SNN
+python run_tracking.py --compare
 ```
 
-**Subject to:**
-- System dynamics (discretized using trapezoidal rule)
-- Control constraints: `-u_max ≤ u ≤ u_max`
-- Initial conditions: `x(0) = x0`, `v(0) = v0`
+### Run CPG with Nengo GUI
+```bash
+cd rl_locomotion
+./run_nengo.sh    # Opens Nengo GUI at http://localhost:8080
+```
 
-## Reference
+## Architecture
 
-Based on the MATLAB implementation:  
-https://github.com/bjarkegosvig/mpc-spring-mass-example
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Spring-Mass FEM Grid                         │
+│                                                                 │
+│   ●──●──●──●     Particles connected by springs                │
+│   │╲/│╲/│╲/│     FEM triangles for hyperelastic response       │
+│   ●──●──●──●     GPU-accelerated implicit integration          │
+│   │╲/│╲/│╲/│                                                    │
+│   ●──●──●──●                                                    │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    SNN CPG Controller                           │
+│                                                                 │
+│   Hopf oscillators with phase coupling                         │
+│   PES learning from strain feedback                            │
+│   Traveling wave locomotion patterns                           │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    SDF Terrain Collision                        │
+│                                                                 │
+│   Procedural: slants, tunnels, boulders                        │
+│   Ratchet friction for directional locomotion                  │
+│   GPU kernel collision detection                               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Key Features
+
+### Locomotion Control
+- **Hopf CPG**: Coupled oscillators generate traveling waves
+- **PES Learning**: Online adaptation from strain/velocity feedback
+- **Directional Friction**: Ratchet-like ground contact for forward motion
+
+### Physics Simulation
+- **Implicit FEM**: Stable large-timestep integration
+- **Neo-Hookean Material**: Nonlinear hyperelastic response
+- **GPU Kernels**: Warp-accelerated force computation
+
+### Terrain Environments
+- **Plane**: Flat ground locomotion baseline
+- **Slant**: Inclined plane climbing (configurable angle)
+- **Tunnel**: Squeeze through narrow passages
+- **Boulder**: Climb over semicircular obstacles
+
+## Requirements
+
+- Docker with NVIDIA GPU support
+- CUDA-capable GPU
+- X11 display (for visualization)
+
+## References
+
+- [Continuous adaptive nonlinear MPC using SNNs](https://doi.org/10.1088/2634-4386/ad4209) - Halaly & Tsur 2024
+- [Nengo: Large-scale brain modelling](https://www.nengo.ai/)
+- [NVIDIA Warp](https://github.com/NVIDIA/warp)
 
 ## License
 
-MIT License - see LICENSE file for details.
+MIT License
