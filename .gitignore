@@ -37,10 +37,16 @@ env/
 .ipynb_checkpoints
 
 # Plots and outputs
-*.png
 *.pdf
 *.jpg
 *.jpeg
+
+# Ignore generated PNGs but allow documentation images
+**/*.png
+!sdf_grid.png
+!pid.png
+!implicit.png
+!explicit.png
 
 # OS
 .DS_Store

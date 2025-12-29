@@ -2,6 +2,8 @@
 
 GPU-accelerated soft robot simulation with Spiking Neural Network (SNN) control using [NVIDIA Warp](https://github.com/NVIDIA/warp) and [Nengo](https://www.nengo.ai/).
 
+![SDF Grid Simulation](sdf_grid.png)
+
 ## Overview
 
 This framework combines:
@@ -99,6 +101,14 @@ cd rl_locomotion
 - **Implicit FEM**: Stable large-timestep integration
 - **Neo-Hookean Material**: Nonlinear hyperelastic response
 - **GPU Kernels**: Warp-accelerated force computation
+
+| Explicit Integration | Implicit Integration |
+|:-------------------:|:--------------------:|
+| ![Explicit](explicit.png) | ![Implicit](implicit.png) |
+
+### PID Control
+
+![PID Controller](pid.png)
 
 ### Terrain Environments
 - **Plane**: Flat ground locomotion baseline
