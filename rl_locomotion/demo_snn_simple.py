@@ -27,7 +27,7 @@ import nengo
 
 from spring_mass_env import SpringMassEnv
 from sim import Model
-from inject_forces_locomotion import InjectForcesLocomotion, get_available_modes, describe_mode
+from balloon_forces import BalloonForces
 
 
 def hopf_dynamics(x, a=5.0, mu=1.0, omega=2*np.pi*2.0, tau=0.01):
@@ -309,11 +309,10 @@ def main():
     # =========================================================================
     # Create Force Injector (horizontal like classic demo)
     # =========================================================================
-    injector = InjectForcesLocomotion(
+    injector = BalloonForces(
         env.model,
         group_size=2,
         device=args.device,
-        mode='horizontal',  # Match classic demo (not radial which pushes up)
         force_scale=args.force_scale,
     )
     
@@ -386,10 +385,10 @@ def main():
             for group_id in range(num_groups):
                 cpg_val = cpg_output[group_id]
                 if abs(cpg_val) > 0.001:
-                    injector.inject_locomotion_force(group_id, cpg_val)
+                    injector.inject(group_id, cpg_val)
         
         # Step physics
-        forces = injector.get_forces_array()
+        forces = injector.get_array()
         action = forces.flatten().astype(np.float32)
         obs, reward, terminated, truncated, info = env.step(action)
         

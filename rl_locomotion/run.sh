@@ -31,7 +31,7 @@ IMAGE_NAME="spring-mass-nengo"
 
 # Quick config or custom
 echo -e "${BLUE}Configuration:${NC}"
-echo "  1) Quick test (defaults: 4x4 grid, locomotion mode, friction=0.5)"
+echo "  1) Quick test (defaults: 4x4 grid, radial mode, friction=0.5)"
 echo "  2) Custom configuration"
 echo ""
 read -p "Select [1/2] (default: 1): " config_choice

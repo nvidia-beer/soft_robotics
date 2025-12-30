@@ -31,7 +31,7 @@ from typing import Optional, Tuple, Dict, Any
 
 from spring_mass_env import SpringMassEnv
 from cpg import HopfCPG
-from inject_forces_locomotion import InjectForcesLocomotion
+from balloon_forces import BalloonForces
 from pygame_renderer import Renderer
 from solvers import SolverImplicit
 from world import apply_sdf_boundary_with_friction_2d
@@ -117,7 +117,7 @@ class DemoBase(ABC):
         self.env: Optional[SpringMassEnv] = None
         self.terrain: Optional[WorldMap] = None
         self.cpg: Optional[HopfCPG] = None
-        self.injector: Optional[InjectForcesLocomotion] = None
+        self.injector: Optional[BalloonForces] = None
         self.renderer: Optional[Renderer] = None
         self.terrain_surface: Optional[pygame.Surface] = None
         
@@ -376,11 +376,10 @@ class DemoBase(ABC):
         print()
         
         # Create force injector
-        self.injector = InjectForcesLocomotion(
+        self.injector = BalloonForces(
             self.env.model,
             group_size=2,
             device=cfg.device,
-            mode='radial',
             force_scale=cfg.force_scale,
         )
         
@@ -447,10 +446,10 @@ class DemoBase(ABC):
         for group_id in range(self.num_groups):
             cpg_val = cpg_output[group_id]
             if abs(cpg_val) > 0.001:
-                self.injector.inject_locomotion_force(group_id, cpg_val)
+                self.injector.inject(group_id, cpg_val)
         
         # Step physics
-        forces = self.injector.get_forces_array()
+        forces = self.injector.get_array()
         action = forces.flatten().astype(np.float32)
         self.env.step(action)
         

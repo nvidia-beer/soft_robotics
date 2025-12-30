@@ -28,7 +28,7 @@ wp.config.enable_graph_capture_on_kernels = False
 
 from spring_mass_env import SpringMassEnv
 from solvers import SolverImplicit
-from inject_forces_locomotion import InjectForcesLocomotion
+from balloon_forces import BalloonForces
 from pygame_renderer import Renderer
 
 # ============================================================================
@@ -148,11 +148,10 @@ print(f"  Total strains: {n_total_strains}")
 # ============================================================================
 
 print("\nCreating Force Injector...")
-injector = InjectForcesLocomotion(
+injector = BalloonForces(
     env.model, 
     group_size=2, 
     device=DEVICE,
-    mode='horizontal',  # Match classic demo (not radial which pushes up)
     force_scale=FORCE_SCALE,
 )
 
@@ -217,10 +216,10 @@ def physics_step(t):
         for group_id in range(num_groups):
             cpg_val = cpg_outputs[group_id] * current_amplitude
             if abs(cpg_val) > 0.001:
-                injector.inject_locomotion_force(group_id, cpg_val)
+                injector.inject(group_id, cpg_val)
     
     # Get forces and step physics
-    forces = injector.get_forces_array()
+    forces = injector.get_array()
     action = forces.flatten().astype(np.float32)
     obs, reward, terminated, truncated, info = env.step(action)
     

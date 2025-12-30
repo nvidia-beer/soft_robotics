@@ -30,7 +30,7 @@ import time
 from spring_mass_env import SpringMassEnv
 from sim import Model
 from cpg import HopfCPG
-from inject_forces_locomotion import InjectForcesLocomotion, get_available_modes, describe_mode
+from balloon_forces import BalloonForces
 from pygame_renderer import Renderer
 
 
@@ -56,10 +56,7 @@ def parse_args():
                         metavar=('DX', 'DY'),
                         help='Movement direction 2D vector (default: 1 0 = right)')
     
-    # Force mode
-    parser.add_argument('--force-mode', '-m', type=str, default='horizontal',
-                        choices=get_available_modes(),
-                        help='Force mode (default: horizontal)')
+    # Force
     parser.add_argument('--force-scale', type=float, default=20.0,
                         help='Force scale multiplier (default: 20.0)')
     
@@ -181,16 +178,14 @@ def main():
     # =========================================================================
     # Create Force Injector
     # =========================================================================
-    injector = InjectForcesLocomotion(
+    injector = BalloonForces(
         env.model,
         group_size=2,
         device=args.device,
-        mode=args.force_mode,
         force_scale=args.force_scale,
     )
     
     print(f"Force Configuration:")
-    print(f"  Mode: {args.force_mode.upper()} - {describe_mode(args.force_mode)}")
     print(f"  Scale: {args.force_scale}")
     print()
     
@@ -282,11 +277,11 @@ def main():
         for group_id in range(num_groups):
             cpg_val = cpg_output[group_id]
             if abs(cpg_val) > 0.001:
-                injector.inject_locomotion_force(group_id, cpg_val)
+                injector.inject(group_id, cpg_val)
                 total_fx += cpg_val
         
         # Get forces and step physics
-        forces = injector.get_forces_array()
+        forces = injector.get_array()
         action = forces.flatten().astype(np.float32)
         
         # Debug: print CPG matrix every ~0.07s (quarter of 4Hz period) to see wave travel
@@ -408,7 +403,7 @@ def main():
         print("  ← Body moved LEFT")
     else:
         print("  ✗ Body didn't move significantly")
-        print("    Try: higher amplitude, more friction, different force mode")
+        print("    Try: higher amplitude, more friction, higher force scale")
     
     env.close()
     pygame.quit()

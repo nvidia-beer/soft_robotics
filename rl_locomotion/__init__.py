@@ -1,11 +1,10 @@
 """
-RL Control - Force Injection & CPG Library for Soft Robotics
+RL Locomotion - Force Injection & CPG Library for Soft Robotics
 
 This package provides force injection and CPG capabilities for locomotion:
 
 Force Injection:
-- InjectForces: Basic force injection with group-based control
-- InjectForcesLocomotion: Locomotion-optimized radial force modes
+- BalloonForces: Balloon-style force injection for locomotion
 
 CPG (Central Pattern Generators):
 - HopfCPG / CPG: Rate-coded Hopf oscillator (simple, fast)
@@ -16,23 +15,13 @@ Author: NBEL
 License: Apache-2.0
 """
 
-from .inject_forces_class import InjectForces
-from .inject_forces_locomotion import (
-    InjectForcesLocomotion,
-    ForceMode,
-    get_available_modes,
-    describe_mode,
-)
+from .balloon_forces import BalloonForces
 from .cpg import HopfCPG, CPG
 from .snn.cpg import NengoCPG, SNN_CPG_Controller, build_snn_cpg_network
 
 __all__ = [
     # Force injection
-    'InjectForces',
-    'InjectForcesLocomotion',
-    'ForceMode',
-    'get_available_modes',
-    'describe_mode',
+    'BalloonForces',
     # Rate-coded CPG
     'HopfCPG',
     'CPG',
