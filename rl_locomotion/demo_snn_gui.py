@@ -35,8 +35,10 @@ from pygame_renderer import Renderer
 # Configuration
 # ============================================================================
 
-N = int(os.environ.get('SNN_GRID_SIZE', '4'))
-N = max(N, 2)
+ROWS = int(os.environ.get('SNN_ROWS', '3'))
+COLS = int(os.environ.get('SNN_COLS', '6'))
+ROWS = max(ROWS, 2)
+COLS = max(COLS, 2)
 DT = float(os.environ.get('SNN_DT', '0.01'))
 DEVICE = os.environ.get('SNN_DEVICE', 'cuda')
 
@@ -61,15 +63,16 @@ BOXSIZE = float(os.environ.get('SNN_BOXSIZE', '2.5'))
 
 # Derived
 OMEGA = 2 * np.pi * FREQUENCY
-num_groups = (N - 1) ** 2
-num_groups_per_side = N - 1
+num_groups = (ROWS - 1) * (COLS - 1)
+num_groups_rows = ROWS - 1
+num_groups_cols = COLS - 1
 
 print(f"{'='*70}")
 print(f"SNN CPG Locomotion - Nengo GUI")
 print(f"{'='*70}")
 print(f"Configuration:")
-print(f"  Grid size: {N}x{N} ({N*N} particles)")
-print(f"  Groups: {num_groups} ({num_groups_per_side}x{num_groups_per_side})")
+print(f"  Grid size: {COLS}x{ROWS} ({ROWS*COLS} particles)")
+print(f"  Groups: {num_groups} ({num_groups_cols}x{num_groups_rows})")
 print(f"  CPG frequency: {FREQUENCY} Hz")
 print(f"  CPG amplitude: {AMPLITUDE}")
 print(f"  Direction: ({DIR_X}, {DIR_Y})")
@@ -88,7 +91,7 @@ pygame.init()
 
 env = SpringMassEnv(
     render_mode='human',
-    N=N,
+    rows=ROWS, cols=COLS,
     dt=DT,
     spring_coeff=50.0,
     spring_damping=0.3,
@@ -137,7 +140,7 @@ n_fem_strains = env.model.tri_count if hasattr(env.model, 'tri_count') else 0
 n_total_strains = n_spring_strains + n_fem_strains
 
 print(f"Environment created:")
-print(f"  Particles: {N}x{N} = {N*N}")
+print(f"  Particles: {COLS}x{ROWS} = {ROWS*COLS}")
 print(f"  Groups: {num_groups}")
 print(f"  Springs: {n_spring_strains}")
 print(f"  FEM triangles: {n_fem_strains}")
@@ -231,7 +234,7 @@ def physics_step(t):
         print(f"\n[SNN CPG] t={t:.2f}s")
         print(f"  Forces: max={max_force:.4f}, sum_fx={total_fx_actual:.4f}, sum_fy={total_fy_actual:.4f}")
         # Print CPG matrix
-        grid_side = num_groups_per_side
+        grid_side = num_groups_cols  # For rendering
         print(f"  CPG Matrix ({grid_side}x{grid_side}):")
         for row in range(grid_side - 1, -1, -1):  # Top to bottom
             row_vals = []
@@ -302,7 +305,7 @@ def render_frame():
         renderer.draw_group_forces_matrix(
             canvas,
             cpg_outputs,
-            num_groups_per_side,
+            num_groups_cols,
             title="CPG:",
             direction=DIRECTION,
         )
@@ -345,7 +348,7 @@ print(f"\n{'='*70}")
 print("Building Nengo Network...")
 print(f"{'='*70}")
 
-model = nengo.Network(label=f"SNN CPG ({N}x{N})")
+model = nengo.Network(label=f"SNN CPG ({COLS}x{ROWS})")
 
 with model:
     
@@ -436,17 +439,17 @@ with model:
     strain_ensembles = []  # Will hold 7D strain ensembles
     
     # Assign strains to groups
-    def particle_to_grid(idx, N):
-        return (idx // N, idx % N)
+    def particle_to_grid(idx, cols):
+        return (idx // cols, idx % cols)
     
-    def get_particle_groups(idx, N):
-        row, col = particle_to_grid(idx, N)
+    def get_particle_groups(idx, rows, cols):
+        row, col = particle_to_grid(idx, cols)
         groups = []
-        if row < N-1 and col < N-1:
+        if row < rows-1 and col < cols-1:
             groups.append((row, col))
-        if row < N-1 and col > 0:
+        if row < rows-1 and col > 0:
             groups.append((row, col-1))
-        if row > 0 and col < N-1:
+        if row > 0 and col < cols-1:
             groups.append((row-1, col))
         if row > 0 and col > 0:
             groups.append((row-1, col-1))
@@ -463,11 +466,11 @@ with model:
             break
         p0 = spring_indices_np[spring_idx]
         p1 = spring_indices_np[spring_idx + 1]
-        groups0 = set(get_particle_groups(p0, N))
-        groups1 = set(get_particle_groups(p1, N))
+        groups0 = set(get_particle_groups(p0, ROWS, COLS))
+        groups1 = set(get_particle_groups(p1, ROWS, COLS))
         common = groups0 & groups1
         for (gr, gc) in common:
-            gid = gr * num_groups_per_side + gc
+            gid = gr * num_groups_cols + gc
             if gid < num_groups:
                 spring_groups[gid].append(spring_idx // 2)
     
@@ -477,12 +480,12 @@ with model:
         if fem_idx + 2 >= len(tri_indices_np):
             break
         p0, p1, p2 = tri_indices_np[fem_idx:fem_idx+3]
-        groups0 = set(get_particle_groups(p0, N))
-        groups1 = set(get_particle_groups(p1, N))
-        groups2 = set(get_particle_groups(p2, N))
+        groups0 = set(get_particle_groups(p0, ROWS, COLS))
+        groups1 = set(get_particle_groups(p1, ROWS, COLS))
+        groups2 = set(get_particle_groups(p2, ROWS, COLS))
         common = groups0 & groups1 & groups2
         for (gr, gc) in common:
-            gid = gr * num_groups_per_side + gc
+            gid = gr * num_groups_cols + gc
             if gid < num_groups:
                 fem_groups[gid].append(fem_idx // 3)
     
@@ -495,8 +498,8 @@ with model:
         group_springs = spring_groups.get(group_id, [])
         group_fems = fem_groups.get(group_id, [])
         
-        group_row = group_id // num_groups_per_side
-        group_col = group_id % num_groups_per_side
+        group_row = group_id // num_groups_cols
+        group_col = group_id % num_groups_cols
         
         # 7D strain ensemble with triangular intercepts (Zaidel et al. 2021)
         n_ens_neurons = N_NEURONS * STRAIN_DIM
@@ -564,27 +567,27 @@ with model:
     # Compute phase offsets (same as cpg.py._init_phases)
     phase_offsets = np.zeros(num_groups)
     for gid in range(num_groups):
-        row = gid // num_groups_per_side
-        col = gid % num_groups_per_side
+        row = gid // num_groups_cols
+        col = gid % num_groups_cols
         phase_offsets[gid] = (col * DIRECTION[0] + row * DIRECTION[1]) * phase_per_cell
     
     # Build neighbor structure (same as cpg.py._build_neighbors)
     neighbors = [[] for _ in range(num_groups)]
     target_phase_diff = {}
     for gid in range(num_groups):
-        row = gid // num_groups_per_side
-        col = gid % num_groups_per_side
+        row = gid // num_groups_cols
+        col = gid % num_groups_cols
         
         # 4-connected neighbors
         neighbor_offsets = []
         if col > 0:
             neighbor_offsets.append((gid - 1, -1, 0))           # left
-        if col < num_groups_per_side - 1:
+        if col < num_groups_cols - 1:
             neighbor_offsets.append((gid + 1, 1, 0))            # right
         if row > 0:
-            neighbor_offsets.append((gid - num_groups_per_side, 0, -1))  # down
-        if row < num_groups_per_side - 1:
-            neighbor_offsets.append((gid + num_groups_per_side, 0, 1))   # up
+            neighbor_offsets.append((gid - num_groups_cols, 0, -1))  # down
+        if row < num_groups_rows - 1:
+            neighbor_offsets.append((gid + num_groups_cols, 0, 1))   # up
         
         for (jid, col_diff, row_diff) in neighbor_offsets:
             neighbors[gid].append(jid)
@@ -603,8 +606,8 @@ with model:
     cpg_ensembles = []
     
     for group_id in range(num_groups):
-        group_row = group_id // num_groups_per_side
-        group_col = group_id % num_groups_per_side
+        group_row = group_id // num_groups_cols
+        group_col = group_id % num_groups_cols
         initial_phase = phase_offsets[group_id]
         
         cpg_ens = nengo.Ensemble(
@@ -801,8 +804,8 @@ with model:
     print(f"  Adding PES learning (rate={PES_LEARNING_RATE})...")
     
     for gid in range(num_groups):
-        group_row = gid // num_groups_per_side
-        group_col = gid % num_groups_per_side
+        group_row = gid // num_groups_cols
+        group_col = gid % num_groups_cols
         
         # Output ensemble: 1D (force magnitude in CPG direction)
         u_ens = nengo.Ensemble(
@@ -927,8 +930,8 @@ with open(config_filename, 'w') as f:
     print(f"Creating config for {num_plots} groups (trajectory_tracking layout)...")
     
     for i in range(num_plots):
-        group_row = i // num_groups_per_side
-        group_col = i % num_groups_per_side
+        group_row = i // num_groups_cols
+        group_col = i % num_groups_cols
         
         # Vertical stacking: each group gets XY + Raster
         y_base = margin_top + i * (pair_height + plot_gap)

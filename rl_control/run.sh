@@ -21,10 +21,11 @@ echo "========================================================================"
 echo ""
 echo "Available demos (extensible framework):"
 echo ""
-echo -e "  ${CYAN}1. PLANE${NC}    - Flat ground locomotion (classic, move right)"
-echo -e "  ${CYAN}2. SLANT${NC}    - Climb inclined plane (default: 45°)"
-echo -e "  ${CYAN}3. TUNNEL${NC}   - Squeeze through passage (default: 90% height)"
-echo -e "  ${CYAN}4. BOULDER${NC}  - Climb over obstacle (default: 50% size)"
+echo -e "  ${CYAN}1. PLANE${NC}         - Flat ground locomotion (classic, move right)"
+echo -e "  ${CYAN}2. SLANT${NC}         - Climb inclined plane (default: 20°)"
+echo -e "  ${CYAN}3. TUNNEL${NC}        - Squeeze through passage (default: 90% height)"
+echo -e "  ${CYAN}4. BOULDER${NC}       - Climb over obstacle (default: 50% size)"
+echo -e "  ${CYAN}5. ANGLED PLANE${NC}  - Uniform tilted plane (default: 20°, no flat start)"
 echo ""
 echo "All demos use classic CPG control (no SNN)."
 echo ""
@@ -37,12 +38,13 @@ IMAGE_NAME="spring-mass-nengo"
 # Demo selection
 echo -e "${BLUE}Select Demo:${NC}"
 echo "  1) Plane (flat ground, classic locomotion)"
-echo "  2) Slant (45° incline, configurable)"
+echo "  2) Slant (20° incline, configurable)"
 echo "  3) Tunnel (90% height, configurable)"
 echo "  4) Boulder (50% size, configurable)"
-echo "  5) Custom configuration"
+echo "  5) Angled Plane (20° uniform tilt, no flat start)"
+echo "  6) Custom configuration"
 echo ""
-read -p "Select [1/2/3/4/5] (default: 1): " demo_choice
+read -p "Select [1/2/3/4/5/6] (default: 1): " demo_choice
 demo_choice=${demo_choice:-1}
 
 case "$demo_choice" in
@@ -76,8 +78,8 @@ case "$demo_choice" in
     2)
         echo ""
         echo -e "${CYAN}=== SLANT DEMO ===${NC}"
-        read -p "Slant angle (degrees, default: 45): " angle
-        angle=${angle:-45}
+        read -p "Slant angle (degrees, default: 20): " angle
+        angle=${angle:-20}
         
         read -p "CPG frequency Hz (default: 4.0): " frequency
         frequency=${frequency:-4.0}
@@ -132,16 +134,47 @@ case "$demo_choice" in
         read -p "Duration seconds (default: 60): " duration
         duration=${duration:-60}
         
+        read -p "Debug SDF collision? (y/N): " debug_sdf
+        DEBUG_FLAG=""
+        if [[ "$debug_sdf" == "y" || "$debug_sdf" == "Y" ]]; then
+            DEBUG_FLAG="--debug-sdf"
+        fi
+        
         CMD="python demo_boulder.py \
             --boulder-ratio ${boulder_ratio} \
             --boulder-position ${boulder_pos} \
             --frequency ${frequency} \
-            --duration ${duration}"
+            --duration ${duration} \
+            ${DEBUG_FLAG}"
         
         DEMO_NAME="Boulder ${boulder_ratio}"
         ;;
         
     5)
+        echo ""
+        echo -e "${CYAN}=== ANGLED PLANE DEMO (20° default) ===${NC}"
+        read -p "Plane angle (degrees, default: 20): " angle
+        angle=${angle:-20}
+        
+        read -p "CPG frequency Hz (default: 4.0): " frequency
+        frequency=${frequency:-4.0}
+        
+        read -p "Force scale (default: 20.0): " force_scale
+        force_scale=${force_scale:-20.0}
+        
+        read -p "Duration seconds (default: 60): " duration
+        duration=${duration:-60}
+        
+        CMD="python demo_angled_plane.py \
+            --angle ${angle} \
+            --frequency ${frequency} \
+            --force-scale ${force_scale} \
+            --duration ${duration}"
+        
+        DEMO_NAME="Angled Plane ${angle}°"
+        ;;
+        
+    6)
         echo ""
         echo -e "${CYAN}=== CUSTOM CONFIGURATION ===${NC}"
         echo ""
@@ -150,11 +183,14 @@ case "$demo_choice" in
         echo "  s) Slant"
         echo "  t) Tunnel"
         echo "  b) Boulder"
-        read -p "Type [p/s/t/b]: " demo_type
+        echo "  a) Angled Plane (uniform tilt)"
+        read -p "Type [p/s/t/b/a]: " demo_type
         
         # Common parameters
-        read -p "Grid size N (default: 4): " grid_n
-        grid_n=${grid_n:-4}
+        read -p "Grid rows/height (default: 3): " grid_rows
+        grid_rows=${grid_rows:-3}
+        read -p "Grid cols/width (default: 6): " grid_cols
+        grid_cols=${grid_cols:-6}
         
         read -p "CPG frequency Hz (default: 4.0): " frequency
         frequency=${frequency:-4.0}
@@ -177,7 +213,7 @@ case "$demo_choice" in
                 read -p "Direction Y (default: 0): " dir_y
                 dir_y=${dir_y:-0}
                 CMD="python demo_plane.py \
-                    --grid-size ${grid_n} \
+                    --rows ${grid_rows} --cols ${grid_cols} \
                     --direction ${dir_x} ${dir_y} \
                     --frequency ${frequency} \
                     --amplitude ${amplitude} \
@@ -186,10 +222,10 @@ case "$demo_choice" in
                 DEMO_NAME="Plane (custom)"
                 ;;
             s|S)
-                read -p "Slant angle (degrees, default: 45): " angle
-                angle=${angle:-45}
+                read -p "Slant angle (degrees, default: 20): " angle
+                angle=${angle:-20}
                 CMD="python demo_slant.py \
-                    --grid-size ${grid_n} \
+                    --rows ${grid_rows} --cols ${grid_cols} \
                     --angle ${angle} \
                     --frequency ${frequency} \
                     --amplitude ${amplitude} \
@@ -203,7 +239,7 @@ case "$demo_choice" in
                 read -p "Tunnel length (default: 3.0): " tunnel_length
                 tunnel_length=${tunnel_length:-3.0}
                 CMD="python demo_tunnel.py \
-                    --grid-size ${grid_n} \
+                    --rows ${grid_rows} --cols ${grid_cols} \
                     --tunnel-ratio ${tunnel_ratio} \
                     --tunnel-length ${tunnel_length} \
                     --frequency ${frequency} \
@@ -218,7 +254,7 @@ case "$demo_choice" in
                 read -p "Boulder position X (default: 3.0): " boulder_pos
                 boulder_pos=${boulder_pos:-3.0}
                 CMD="python demo_boulder.py \
-                    --grid-size ${grid_n} \
+                    --rows ${grid_rows} --cols ${grid_cols} \
                     --boulder-ratio ${boulder_ratio} \
                     --boulder-position ${boulder_pos} \
                     --frequency ${frequency} \
@@ -226,6 +262,18 @@ case "$demo_choice" in
                     --force-scale ${force_scale} \
                     --duration ${duration}"
                 DEMO_NAME="Boulder (custom)"
+                ;;
+            a|A)
+                read -p "Plane angle (degrees, default: 20): " angle
+                angle=${angle:-20}
+                CMD="python demo_angled_plane.py \
+                    --rows ${grid_rows} --cols ${grid_cols} \
+                    --angle ${angle} \
+                    --frequency ${frequency} \
+                    --amplitude ${amplitude} \
+                    --force-scale ${force_scale} \
+                    --duration ${duration}"
+                DEMO_NAME="Angled Plane ${angle}° (custom)"
                 ;;
             *)
                 echo -e "${RED}Invalid demo type${NC}"
@@ -242,7 +290,35 @@ esac
 
 echo ""
 echo "========================================================================"
-echo -e "${GREEN}Running: ${DEMO_NAME}${NC}"
+echo -e "${GREEN}Configuration Summary:${NC}"
+echo "========================================================================"
+echo -e "  Demo: ${CYAN}${DEMO_NAME}${NC}"
+echo ""
+echo -e "${YELLOW}Force System:${NC}"
+echo "  Mode: Balloon (radial inflate/deflate)"
+echo "  Ratchet friction: enabled"
+echo "  Locomotion: CPG traveling wave + ground friction"
+echo ""
+echo -e "${YELLOW}Debug Visualization:${NC}"
+echo "  SDF collision: cyan circles + arrows on ground-touching particles"
+echo ""
+echo -e "${YELLOW}CPG Matrix (6x3 grid = 10 groups):${NC}"
+echo ""
+echo "    Groups numbered bottom-to-top, left-to-right:"
+echo ""
+echo "    +-----+-----+-----+-----+-----+"
+echo "    |  5  |  6  |  7  |  8  |  9  |  <- top row"
+echo "    +-----+-----+-----+-----+-----+"
+echo "    |  0  |  1  |  2  |  3  |  4  |  <- bottom row (touches ground)"
+echo "    +-----+-----+-----+-----+-----+"
+echo ""
+echo "    Phase wave travels: bottom -> top (for forward motion)"
+echo ""
+echo -e "${YELLOW}Balloon Forces:${NC}"
+echo "  CPG output > 0: INFLATE (push outward from centroid)"
+echo "  CPG output < 0: DEFLATE (pull inward to centroid)"
+echo ""
+echo "  Traveling wave + ratchet friction = locomotion"
 echo "========================================================================"
 echo ""
 echo "Controls:"

@@ -56,9 +56,16 @@ class BalloonForces:
         self.group_size = group_size
         self.force_scale = force_scale
         
-        # Infer grid dimensions
-        self.N = int(np.sqrt(model.particle_count))
-        assert self.N * self.N == model.particle_count, "Model must be a square grid"
+        # Infer grid dimensions (support rectangular grids)
+        if hasattr(model, 'grid_rows') and hasattr(model, 'grid_cols'):
+            # Rectangular grid
+            self.rows = model.grid_rows
+            self.cols = model.grid_cols
+        else:
+            # Square grid (backward compatible)
+            self.rows = int(np.sqrt(model.particle_count))
+            self.cols = self.rows
+            assert self.rows * self.cols == model.particle_count, "Model must be a square or rectangular grid"
         
         # Force accumulator
         self.forces_np = np.zeros((model.particle_count, 2), dtype=np.float32)
@@ -76,31 +83,36 @@ class BalloonForces:
         print(f"\n{'='*60}")
         print(f"BalloonForces Initialized")
         print(f"{'='*60}")
-        print(f"  Grid: {self.N}x{self.N} = {model.particle_count} particles")
-        print(f"  Groups: {self.num_groups} ({self.N - self.group_size + 1}x{self.N - self.group_size + 1})")
+        print(f"  Grid: {self.cols}x{self.rows} = {model.particle_count} particles")
+        print(f"  Groups: {self.num_groups}")
         print(f"  Force scale: {force_scale}")
         print(f"{'='*60}\n")
     
     def _build_groups(self):
-        """Build overlapping group structure."""
-        groups_per_dim = self.N - self.group_size + 1
+        """Build overlapping group structure (supports rectangular grids)."""
+        groups_rows = self.rows - self.group_size + 1
+        groups_cols = self.cols - self.group_size + 1
         
-        if groups_per_dim <= 0:
-            groups_per_dim = 1
+        if groups_rows <= 0:
+            groups_rows = 1
+        if groups_cols <= 0:
+            groups_cols = 1
         
-        self.num_groups = groups_per_dim * groups_per_dim
+        self.num_groups = groups_rows * groups_cols
+        self.group_rows = groups_rows
+        self.group_cols = groups_cols
         
-        # Build from bottom to top
+        # Build from bottom to top, left to right
         group_id = 0
-        for group_row in range(groups_per_dim - 1, -1, -1):
-            for group_col in range(groups_per_dim):
+        for group_row in range(groups_rows - 1, -1, -1):
+            for group_col in range(groups_cols):
                 particle_indices = []
                 for local_row in range(self.group_size):
                     for local_col in range(self.group_size):
                         particle_row = group_row + local_row
                         particle_col = group_col + local_col
-                        if particle_row < self.N and particle_col < self.N:
-                            particle_idx = particle_row * self.N + particle_col
+                        if particle_row < self.rows and particle_col < self.cols:
+                            particle_idx = particle_row * self.cols + particle_col
                             particle_indices.append(particle_idx)
                 
                 self.group_info[group_id] = particle_indices

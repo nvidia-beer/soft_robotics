@@ -89,7 +89,8 @@ class TrackingEnv(SpringMassEnv):
     def __init__(
         self,
         render_mode='human',
-        N=3,  # 3x3 grid
+        rows=3,  # Grid rows
+        cols=3,  # Grid cols
         dt=0.01,
         spring_stiffness=40.0,
         spring_damping=0.5,
@@ -126,7 +127,7 @@ class TrackingEnv(SpringMassEnv):
         # Initialize parent class
         super().__init__(
             render_mode=render_mode,
-            N=N,
+            rows=rows, cols=cols,
             dt=dt,
             spring_coeff=spring_coeff,
             spring_damping=spring_damping,
@@ -274,27 +275,28 @@ class TrackingEnv(SpringMassEnv):
         For 6x6 grid (N=6) -> 5x5 = 25 groups:
             Center group (12) is the middle of the 5x5 arrangement.
         """
-        # Validate: N must be >= 2 for at least one group
-        if self.N < 2:
-            raise ValueError(f"Grid size N must be >= 2 (got N={self.N}). "
+        # Validate: rows/cols must be >= 2 for at least one group
+        if self.rows < 2 or self.cols < 2:
+            raise ValueError(f"Grid must be at least 2x2 (got {self.rows}x{self.cols}). "
                            f"Need at least 2x2 particles for 1 group.")
         
-        # Number of 2x2 groups = (N-1) x (N-1)
-        self.groups_per_side = self.N - 1
-        self.num_groups = self.groups_per_side * self.groups_per_side
+        # Number of 2x2 groups = (rows-1) x (cols-1)
+        self.groups_rows = self.rows - 1
+        self.groups_cols = self.cols - 1
+        self.num_groups = self.groups_rows * self.groups_cols
         
         # Build group membership: group_id -> [particle_indices]
         self.group_info = {}
         for group_id in range(self.num_groups):
-            group_row = group_id // self.groups_per_side
-            group_col = group_id % self.groups_per_side
+            group_row = group_id // self.groups_cols
+            group_col = group_id % self.groups_cols
             
             # 4 particles in 2x2 cell
             particles = [
-                group_row * self.N + group_col,           # top-left
-                group_row * self.N + group_col + 1,       # top-right
-                (group_row + 1) * self.N + group_col,     # bottom-left
-                (group_row + 1) * self.N + group_col + 1, # bottom-right
+                group_row * self.cols + group_col,           # top-left
+                group_row * self.cols + group_col + 1,       # top-right
+                (group_row + 1) * self.cols + group_col,     # bottom-left
+                (group_row + 1) * self.cols + group_col + 1, # bottom-right
             ]
             self.group_info[group_id] = particles
         
@@ -308,7 +310,7 @@ class TrackingEnv(SpringMassEnv):
         self.boundary_indices = np.array([])
         
         print(f"  Group structure (2x2 overlapping cells):")
-        print(f"    Number of groups: {self.num_groups} ({self.groups_per_side}x{self.groups_per_side})")
+        print(f"    Number of groups: {self.num_groups} ({self.groups_rows}x{self.groups_cols})")
         print(f"    ANCHOR GROUP: 0 (particles {list(self.center_indices)}) - rotation center")
         print(f"    ALL group centroids track targets with rotation!")
     
@@ -705,9 +707,9 @@ class TrackingEnv(SpringMassEnv):
         # Line 5: Model info  
         has_fem = hasattr(self.model, 'tri_count') and self.model.tri_count > 0
         if has_fem:
-            info_text = f"Grid: {self.N}x{self.N} | Springs: {self.model.spring_count} | FEM: {self.model.tri_count}"
+            info_text = f"Grid: {self.cols}x{self.rows} | Springs: {self.model.spring_count} | FEM: {self.model.tri_count}"
         else:
-            info_text = f"Grid: {self.N}x{self.N} | Springs: {self.model.spring_count}"
+            info_text = f"Grid: {self.cols}x{self.rows} | Springs: {self.model.spring_count}"
         canvas.blit(font_small.render(info_text, True, (100, 100, 100)), (10, 86))
     
     def _create_tracking_plots(self):
@@ -768,7 +770,7 @@ class TrackingEnv(SpringMassEnv):
             target_ys = group_targets[:, 1] - init_center[1]
             
             # Draw BLACK circles with numbers for targets (same size)
-            gs = self.groups_per_side
+            gr, gc = self.groups_rows, self.groups_cols  # group rows and cols
             for group_id in range(self.num_groups):
                 gx, gy = target_xs[group_id], target_ys[group_id]  # Renamed to avoid conflict with tx, ty
                 circle_size = 0.025  # Same size for all
@@ -781,11 +783,11 @@ class TrackingEnv(SpringMassEnv):
                            fontsize=7, fontweight='bold', color='white', zorder=5)
             
             # Connect target grid points with black lines
-            for row in range(gs):
-                row_indices = [row * gs + col for col in range(gs)]
+            for row in range(gr):
+                row_indices = [row * gc + col for col in range(gc)]
                 ax.plot(target_xs[row_indices], target_ys[row_indices], 'k-', alpha=0.3, linewidth=1)
-            for col in range(gs):
-                col_indices = [row * gs + col for row in range(gs)]
+            for col in range(gc):
+                col_indices = [row * gc + col for row in range(gr)]
                 ax.plot(target_xs[col_indices], target_ys[col_indices], 'k-', alpha=0.3, linewidth=1)
             
             # Draw actual grid (HOT PINK circles - matching simulation)
@@ -805,12 +807,12 @@ class TrackingEnv(SpringMassEnv):
                            color='white', zorder=6)
             
             # Connect actual grid points (pink lines)
-            for row in range(gs):
-                row_indices = [row * gs + col for col in range(gs)]
+            for row in range(gr):
+                row_indices = [row * gc + col for col in range(gc)]
                 ax.plot(actual_xs[row_indices], actual_ys[row_indices], color=hot_pink, 
                        alpha=0.5, linewidth=2)
-            for col in range(gs):
-                col_indices = [row * gs + col for row in range(gs)]
+            for col in range(gc):
+                col_indices = [row * gc + col for row in range(gr)]
                 ax.plot(actual_xs[col_indices], actual_ys[col_indices], color=hot_pink, 
                        alpha=0.5, linewidth=2)
             

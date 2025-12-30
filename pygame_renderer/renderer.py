@@ -933,6 +933,7 @@ class Renderer:
         position: Optional[Tuple[int, int]] = None,
         title: str = "Group Forces:",
         direction: Optional[np.ndarray] = None,
+        group_rows: Optional[int] = None,
     ):
         """
         Draw a matrix display of group force values with optional direction indicator.
@@ -940,25 +941,28 @@ class Renderer:
         Args:
             canvas: pygame Surface to draw on
             force_values: Array of force values per group
-            groups_per_side: Number of groups per side (sqrt of total groups)
+            groups_per_side: Number of columns (groups per row)
             center_group_id: Optional center group to highlight
             position: Optional (x, y) position
             title: Matrix title
             direction: Optional 2D direction vector [dx, dy] to show inside the box
+            group_rows: Optional number of rows (defaults to groups_per_side for square)
         """
         cell_size = 35
+        group_cols = groups_per_side
+        group_rows = group_rows if group_rows is not None else groups_per_side
         
         # Calculate panel height (taller if direction is included)
-        base_height = groups_per_side * cell_size + 60
+        base_height = group_rows * cell_size + 60
         panel_height = base_height + 50 if direction is not None else base_height
         
         if position is None:
-            matrix_x = self.window_width - (groups_per_side * cell_size + 25)
+            matrix_x = self.window_width - (group_cols * cell_size + 25)
             matrix_y = self.window_height - panel_height - 10
         else:
             matrix_x, matrix_y = position
         
-        panel_width = groups_per_side * cell_size + 15
+        panel_width = group_cols * cell_size + 15
         
         # Background
         bg_rect = pygame.Rect(matrix_x, matrix_y, panel_width, panel_height)
@@ -972,17 +976,17 @@ class Renderer:
         cells_x = matrix_x + 5
         matrix_start_y = matrix_y + 22
         
-        num_groups = groups_per_side * groups_per_side
+        num_groups = group_cols * group_rows
         
         for gid in range(min(len(force_values), num_groups)):
-            row = gid // groups_per_side
-            col = gid % groups_per_side
+            row = gid // group_cols
+            col = gid % group_cols
             
             val = force_values[gid]
             
             # Cell position (bottom-up to match simulation)
             cell_x = cells_x + col * cell_size
-            cell_y = matrix_start_y + (groups_per_side - 1 - row) * cell_size
+            cell_y = matrix_start_y + (group_rows - 1 - row) * cell_size
             
             # Color based on value
             cell_color = self._get_force_color(abs(val))
@@ -1004,7 +1008,7 @@ class Renderer:
             canvas.blit(val_text, text_rect)
         
         # Legend
-        legend_y = matrix_start_y + groups_per_side * cell_size + 3
+        legend_y = matrix_start_y + group_rows * cell_size + 3
         canvas.blit(self.font_small.render("+out/-in", True, self.BLACK), (cells_x, legend_y))
         
         # Direction indicator (inside the box, below legend)
@@ -1019,7 +1023,7 @@ class Renderer:
                 dir_norm = np.array([1.0, 0.0])
             
             # Arrow center position (centered in panel, below legend)
-            arrow_cx = cells_x + (groups_per_side * cell_size) // 2
+            arrow_cx = cells_x + (group_cols * cell_size) // 2
             arrow_cy = legend_y + 28
             arrow_length = 25
             
@@ -1333,6 +1337,98 @@ class Renderer:
             
             pygame.draw.circle(canvas, color, screen_pos, radius_px)
             pygame.draw.circle(canvas, (40, 40, 50), screen_pos, radius_px, 1)
+    
+    def draw_sdf_collision_debug(
+        self,
+        canvas: pygame.Surface,
+        positions: np.ndarray,
+        sdf: np.ndarray,
+        sdf_grad_x: np.ndarray,
+        sdf_grad_y: np.ndarray,
+        resolution: float,
+        origin: Tuple[float, float] = (0.0, 0.0),
+        normal_color: Tuple[int, int, int] = (0, 200, 200),  # Cyan
+        arrow_length: int = 20,
+        near_threshold: float = 0.15,  # Increased to show arrows on ground-touching particles
+    ):
+        """
+        Draw debug visualization for SDF collision detection.
+        
+        Shows:
+        - Cyan circles around particles near/touching terrain
+        - Cyan arrows showing collision normals (orthogonal to SDF surface)
+        
+        Args:
+            canvas: pygame Surface to draw on
+            positions: Array of shape (N, 2) with particle world positions
+            sdf: Signed distance field array
+            sdf_grad_x: X gradient of SDF
+            sdf_grad_y: Y gradient of SDF
+            resolution: Pixels per world unit (SDF resolution)
+            origin: World coordinates of SDF origin (x, y)
+            normal_color: Color for collision normals (default: cyan)
+            arrow_length: Length of normal arrows in pixels
+            near_threshold: Distance threshold for "near collision" in world units
+        """
+        sdf_height, sdf_width = sdf.shape
+        collision_count = 0
+        near_count = 0
+        
+        for i, pos in enumerate(positions):
+            if np.isnan(pos[0]) or np.isnan(pos[1]):
+                continue
+            
+            # Convert world to SDF pixel coordinates
+            px = (pos[0] - origin[0]) * resolution
+            py = (pos[1] - origin[1]) * resolution
+            
+            # Check bounds
+            if px < 0 or px >= sdf_width or py < 0 or py >= sdf_height:
+                continue
+            
+            # Sample SDF with bilinear interpolation
+            x0, y0 = int(px), int(py)
+            x1 = min(x0 + 1, sdf_width - 1)
+            y1 = min(y0 + 1, sdf_height - 1)
+            fx, fy = px - x0, py - y0
+            
+            v00 = sdf[y0, x0]
+            v01 = sdf[y0, x1]
+            v10 = sdf[y1, x0]
+            v11 = sdf[y1, x1]
+            
+            v0 = v00 * (1 - fx) + v01 * fx
+            v1 = v10 * (1 - fx) + v11 * fx
+            sdf_value = (v0 * (1 - fy) + v1 * fy) / resolution  # Convert to world units
+            
+            # Get screen position
+            screen_pos = self.world_to_screen(pos[0], pos[1])
+            
+            # Draw cyan circle around particles near or touching boundary
+            if sdf_value < 0:
+                # In collision - cyan circle around particle
+                collision_count += 1
+                pygame.draw.circle(canvas, normal_color, screen_pos, 14, 3)  # Outer ring
+                pygame.draw.circle(canvas, normal_color, screen_pos, 10, 2)  # Inner ring
+                    
+            elif sdf_value < near_threshold:
+                # Near collision - cyan circle around particle
+                near_count += 1
+                pygame.draw.circle(canvas, normal_color, screen_pos, 12, 2)  # Single ring
+            
+            # Draw normal arrow for particles touching or near the ground
+            if sdf_value < near_threshold:
+                gx = sdf_grad_x[y0, x0]
+                gy = sdf_grad_y[y0, x0]
+                grad_len = np.sqrt(gx**2 + gy**2)
+                if grad_len > 1e-6:
+                    nx_dir = gx / grad_len
+                    ny_dir = gy / grad_len
+                    ex = screen_pos[0] + int(nx_dir * arrow_length)
+                    ey = screen_pos[1] - int(ny_dir * arrow_length)  # Flip Y
+                    pygame.draw.line(canvas, normal_color, screen_pos, (ex, ey), 3)
+                    pygame.draw.circle(canvas, normal_color, (ex, ey), 4)
+        
     
     def draw_forward_direction(
         self,

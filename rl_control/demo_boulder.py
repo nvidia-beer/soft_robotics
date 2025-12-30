@@ -56,6 +56,7 @@ class BoulderDemo(DemoBase):
         if self.config:
             self.config.gravity = -0.6
             self.config.force_scale = 25.0
+            # Anisotropic friction is now ON by default in DemoConfig
     
     def create_terrain(self) -> WorldMap:
         """Create boulder terrain."""
@@ -115,6 +116,7 @@ class BoulderDemo(DemoBase):
         
         lines.insert(3, (f"Height: {cy:.3f} (max: {self.max_height:.3f})", (100, 50, 0)))
         lines.insert(4, (f"Status: {status}", (0, 100, 0) if self.passed_boulder else (0, 0, 0)))
+        
         return lines
     
     def draw_custom(self, canvas: pygame.Surface) -> None:

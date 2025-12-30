@@ -54,8 +54,10 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Test Renderer')
     parser.add_argument('--duration', '-t', type=float, default=30.0,
                         help='Duration in seconds (default: 30)')
-    parser.add_argument('--grid-size', '-n', type=int, default=4,
-                        help='Grid size NxN (default: 4)')
+    parser.add_argument('--rows', type=int, default=3,
+                        help='Grid rows (height, default: 3)')
+    parser.add_argument('--cols', type=int, default=6,
+                        help='Grid cols (width, default: 6)')
     parser.add_argument('--no-fem', action='store_true',
                         help='Disable FEM triangles')
     parser.add_argument('--device', type=str, default='cuda',
@@ -71,6 +73,8 @@ def parse_args():
                         help='Show SDF background (brown=walls, white=passable)')
     parser.add_argument('--map-image', type=str, default='map.png',
                         help='Path to world map image for SDF background (default: map.png)')
+    parser.add_argument('--debug-sdf', action='store_true', default=True,
+                        help='Show SDF collision debug (default: enabled with --with-sdf)')
     return parser.parse_args()
 
 
@@ -81,7 +85,7 @@ def run_with_physics(args):
     # Create environment
     env = SpringMassEnv(
         render_mode='human',
-        N=args.grid_size,
+        rows=args.rows, cols=args.cols,
         dt=0.01,
         spring_coeff=50.0,
         spring_damping=0.3,
@@ -130,6 +134,11 @@ def run_with_physics(args):
     map_height = 0
     restitution = 0.3
     
+    # Numpy arrays for debug rendering
+    sdf_np = None
+    sdf_grad_x_np = None
+    sdf_grad_y_np = None
+    
     if args.with_sdf:
         # Use WorldMap from world_map module for all SDF calculations
         try:
@@ -170,6 +179,11 @@ def run_with_physics(args):
                 map_width = sdf.shape[1]
                 map_height = sdf.shape[0]
                 
+                # Store numpy arrays for debug rendering
+                sdf_np = sdf.copy()
+                sdf_grad_x_np = sdf_grad_x.copy()
+                sdf_grad_y_np = sdf_grad_y.copy()
+                
                 print(f"  World size: {world_map.world_size[0]:.2f}x{world_map.world_size[1]:.2f}")
                 
                 # Create SDF surface for rendering (uses renderer)
@@ -186,27 +200,28 @@ def run_with_physics(args):
                     print(f"  SDF collision: DISABLED (kernel not available)")
     
     # Setup group info for centroids
-    N = args.grid_size
-    groups_per_side = N - 1
-    num_groups = groups_per_side * groups_per_side
+    rows, cols = args.rows, args.cols
+    groups_rows = rows - 1
+    groups_cols = cols - 1
+    num_groups = groups_rows * groups_cols
     
     group_info = {}
     for group_id in range(num_groups):
-        row = group_id // groups_per_side
-        col = group_id % groups_per_side
+        gr = group_id // groups_cols
+        gc = group_id % groups_cols
         particles = [
-            row * N + col,
-            row * N + col + 1,
-            (row + 1) * N + col,
-            (row + 1) * N + col + 1,
+            gr * cols + gc,
+            gr * cols + gc + 1,
+            (gr + 1) * cols + gc,
+            (gr + 1) * cols + gc + 1,
         ]
         group_info[group_id] = particles
     
     # Pass group info to env for centroid calculation
     env.group_info = group_info
     
-    print(f"Grid: {N}x{N} = {N*N} particles")
-    print(f"Groups: {num_groups} ({groups_per_side}x{groups_per_side})")
+    print(f"Grid: {cols}x{rows} = {rows*cols} particles")
+    print(f"Groups: {num_groups} ({groups_cols}x{groups_rows})")
     print(f"FEM: {'Enabled' if not args.no_fem else 'Disabled'}")
     print(f"SDF Background: {'Enabled' if sdf_surface else 'Disabled'}")
     print(f"SDF Collision: {'Enabled' if sdf_collision_enabled else 'Disabled'}")
@@ -350,6 +365,18 @@ def run_with_physics(args):
             # 3. Draw particles
             renderer.draw_particles(canvas, env.pos_np)
             
+            # 3.5 Draw SDF collision debug (if enabled)
+            if args.debug_sdf and sdf_collision_enabled:
+                renderer.draw_sdf_collision_debug(
+                    canvas,
+                    env.pos_np,
+                    sdf_np,
+                    sdf_grad_x_np,
+                    sdf_grad_y_np,
+                    map_resolution,
+                    origin=(float(map_origin[0]), float(map_origin[1])),
+                )
+            
             # 4. Draw group centroids (HOT PINK)
             renderer.draw_group_centroids(
                 canvas,
@@ -408,7 +435,7 @@ def run_with_physics(args):
             fps = frame_count / max(time.time() - start_time, 0.01)
             info_lines = [
                 (f"Time: {t:.2f}s | FPS: {fps:.1f}", (0, 0, 0)),
-                (f"Grid: {N}x{N} | Groups: {num_groups} | Device: {args.device}", (100, 100, 100)),
+                (f"Grid: {cols}x{rows} | Groups: {num_groups} | Device: {args.device}", (100, 100, 100)),
                 (f"Collision: {'ON' if sdf_collision_enabled else 'OFF'}", (0, 150, 0) if sdf_collision_enabled else (150, 150, 150)),
                 (f"Active forces: {len(active_forces)} | Press F to apply", (0, 100, 200)),
             ]
@@ -420,7 +447,7 @@ def run_with_physics(args):
                 renderer.draw_group_forces_matrix(
                     canvas,
                     force_values,
-                    groups_per_side,
+                    groups_cols,
                     center_group_id=num_groups // 2,
                     title="Forces"
                 )
@@ -461,6 +488,12 @@ def run_visualization_only(args):
     
     # Load SDF background if requested (uses WorldMap from world_map module)
     sdf_surface = None
+    sdf_np = None
+    sdf_grad_x_np = None
+    sdf_grad_y_np = None
+    sdf_resolution = 1.0
+    sdf_origin = (0.0, 0.0)
+    
     if args.with_sdf:
         try:
             from world_map import WorldMap
@@ -483,55 +516,60 @@ def run_visualization_only(args):
                 from PIL import Image
                 img = Image.open(image_path)
                 img_height = img.size[1]
-                resolution = img_height / args.boxsize
+                sdf_resolution = img_height / args.boxsize
                 
                 # Use WorldMap for SDF calculation
-                world_map = WorldMap(image_path=image_path, resolution=resolution)
-                sdf = world_map.sdf
+                world_map = WorldMap(image_path=image_path, resolution=sdf_resolution)
+                map_data = world_map.to_numpy_arrays()
+                sdf_np = map_data['sdf']
+                sdf_grad_x_np = map_data['sdf_grad_x']
+                sdf_grad_y_np = map_data['sdf_grad_y']
+                sdf_origin = (float(map_data['origin'][0]), float(map_data['origin'][1]))
                 
-                sdf_surface = renderer.create_sdf_surface(sdf, resolution, alpha=255, max_distance=20.0)
+                sdf_surface = renderer.create_sdf_surface(sdf_np, sdf_resolution, alpha=255, max_distance=20.0)
     
     # Create fake data
-    N = args.grid_size
-    groups_per_side = N - 1
-    num_groups = groups_per_side * groups_per_side
+    rows, cols = args.rows, args.cols
+    groups_rows = rows - 1
+    groups_cols = cols - 1
+    num_groups = groups_rows * groups_cols
     
     # Create grid positions
     spacing = 0.25
     offset_x = 1.0
     offset_y = 1.0
     
-    positions = np.zeros((N * N, 2), dtype=np.float32)
-    for i in range(N):
-        for j in range(N):
-            idx = i * N + j
-            positions[idx] = [offset_x + j * spacing, offset_y + i * spacing]
+    positions = np.zeros((rows * cols, 2), dtype=np.float32)
+    for r in range(rows):
+        for c in range(cols):
+            idx = r * cols + c
+            positions[idx] = [offset_x + c * spacing, offset_y + r * spacing]
     
     # Create spring indices (horizontal + vertical + diagonal)
     spring_indices = []
-    for i in range(N):
-        for j in range(N):
-            idx = i * N + j
+    for r in range(rows):
+        for c in range(cols):
+            idx = r * cols + c
             # Right
-            if j < N - 1:
+            if c < cols - 1:
                 spring_indices.extend([idx, idx + 1])
             # Down
-            if i < N - 1:
-                spring_indices.extend([idx, idx + N])
+            if r < rows - 1:
+                spring_indices.extend([idx, idx + cols])
             # Diagonal
-            if i < N - 1 and j < N - 1:
-                spring_indices.extend([idx, idx + N + 1])
-                spring_indices.extend([idx + 1, idx + N])
+            if r < rows - 1 and c < cols - 1:
+                spring_indices.extend([idx, idx + cols + 1])
+                spring_indices.extend([idx + 1, idx + cols])
     spring_indices = np.array(spring_indices, dtype=np.int32)
     num_springs = len(spring_indices) // 2
     
     # Create triangle indices
     tri_indices = []
-    for i in range(N - 1):
-        for j in range(N - 1):
-            idx = i * N + j
-            tri_indices.extend([idx, idx + 1, idx + N])
-            tri_indices.extend([idx + 1, idx + N + 1, idx + N])
+    for r in range(rows - 1):
+        for c in range(cols - 1):
+            idx = r * cols + c
+            tri_indices.extend([idx, idx + 1, idx + cols])
+            tri_indices.extend([idx + 1, idx + cols + 1, idx + cols])
     tri_indices = np.array(tri_indices, dtype=np.int32)
     num_triangles = len(tri_indices) // 3
     
@@ -539,18 +577,18 @@ def run_visualization_only(args):
     centroids = np.zeros((num_groups, 2), dtype=np.float32)
     group_info = {}
     for gid in range(num_groups):
-        row = gid // groups_per_side
-        col = gid % groups_per_side
+        gr = gid // groups_cols
+        gc = gid % groups_cols
         particles = [
-            row * N + col,
-            row * N + col + 1,
-            (row + 1) * N + col,
-            (row + 1) * N + col + 1,
+            gr * cols + gc,
+            gr * cols + gc + 1,
+            (gr + 1) * cols + gc,
+            (gr + 1) * cols + gc + 1,
         ]
         group_info[gid] = particles
         centroids[gid] = np.mean(positions[particles], axis=0)
     
-    print(f"Grid: {N}x{N} = {N*N} particles")
+    print(f"Grid: {cols}x{rows} = {rows*cols} particles")
     print(f"Springs: {num_springs}")
     print(f"Triangles: {num_triangles}")
     print(f"Groups: {num_groups}")
@@ -615,6 +653,19 @@ def run_visualization_only(args):
         
         renderer.draw_springs(canvas, spring_indices, animated_positions, spring_strains)
         renderer.draw_particles(canvas, animated_positions)
+        
+        # Draw SDF collision debug if enabled
+        if args.debug_sdf and sdf_np is not None:
+            renderer.draw_sdf_collision_debug(
+                canvas,
+                animated_positions,
+                sdf_np,
+                sdf_grad_x_np,
+                sdf_grad_y_np,
+                sdf_resolution,
+                origin=sdf_origin,
+            )
+        
         renderer.draw_group_centroids(canvas, centroids, list(range(num_groups)))
         
         # Draw radial force arrows
@@ -626,12 +677,12 @@ def run_visualization_only(args):
         renderer.draw_force_legend(canvas, max_force=1.0)
         
         # Draw group forces matrix
-        renderer.draw_group_forces_matrix(canvas, force_values, groups_per_side, title="Forces")
+        renderer.draw_group_forces_matrix(canvas, force_values, groups_cols, title="Forces")
         
         # Info text
         info_lines = [
             (f"Time: {t:.2f}s | Visualization Demo", (0, 0, 0)),
-            (f"Grid: {N}x{N} | Springs: {num_springs} | Triangles: {num_triangles}", (100, 100, 100)),
+            (f"Grid: {cols}x{rows} | Springs: {num_springs} | Triangles: {num_triangles}", (100, 100, 100)),
             (f"Forces: {'Animated' if animate_forces else 'Off'} (Press F to toggle)", (0, 150, 0)),
         ]
         renderer.draw_info_text(canvas, info_lines, position=(10, 10))

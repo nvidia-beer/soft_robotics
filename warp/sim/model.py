@@ -412,12 +412,15 @@ class Model:
         return model
     
     @classmethod
-    def from_grid(cls, N: int, spacing: float = 0.25, device='cuda', boxsize: float = 3.0, with_fem: bool = True, with_springs: bool = True):
+    def from_grid(cls, rows: int = 3, cols: int = 6, 
+                  spacing: float = 0.25, device='cuda', boxsize: float = 3.0, 
+                  with_fem: bool = True, with_springs: bool = True):
         """
-        Create a regular NxN grid spring-mass model.
+        Create a grid spring-mass model.
         
         Args:
-            N: Grid size (creates NxN particles)
+            rows: Number of rows (height, Y direction). Default 3.
+            cols: Number of columns (width, X direction). Default 6.
             spacing: Distance between adjacent particles
             device: Warp device ('cuda' or 'cpu')
             boxsize: Size of simulation box (grid will be centered in box)
@@ -426,22 +429,31 @@ class Model:
         
         Returns:
             Model: The initialized model
+        
+        Examples:
+            >>> model = Model.from_grid()                 # 6x3 default (stable)
+            >>> model = Model.from_grid(rows=4, cols=4)   # 4x4 square grid
         """
+        
         model = cls(device=device)
         model.boxsize = boxsize
+        model.grid_rows = rows
+        model.grid_cols = cols
         
-        n_particles = N * N
+        n_particles = rows * cols
         model.particle_count = n_particles
         
-        # Create grid positions (centered in box, using positive coordinates)
-        mesh_size = spacing * (N - 1)
-        offset = (boxsize - mesh_size) / 2.0
+        # Create grid positions (centered in box)
+        mesh_width = spacing * (cols - 1)
+        mesh_height = spacing * (rows - 1)
+        offset_x = (boxsize - mesh_width) / 2.0
+        offset_y = (boxsize - mesh_height) / 2.0
         
         positions = []
-        for i in range(N):
-            for j in range(N):
-                x = j * spacing + offset
-                y = i * spacing + offset
+        for r in range(rows):
+            for c in range(cols):
+                x = c * spacing + offset_x
+                y = r * spacing + offset_y
                 positions.append([x, y])
         
         pos_np = np.array(positions, dtype=np.float32)
@@ -458,28 +470,28 @@ class Model:
             spring_indices = []
             spring_lengths = []
             
-            def sub2ind(i, j):
-                return i * N + j
+            def sub2ind(r, c):
+                return r * cols + c
             
             # Horizontal springs
-            for r in range(N):
-                for c in range(N - 1):
+            for r in range(rows):
+                for c in range(cols - 1):
                     i = sub2ind(r, c)
                     j = sub2ind(r, c + 1)
                     spring_indices.extend([i, j])
                     spring_lengths.append(spacing)
             
             # Vertical springs
-            for r in range(N - 1):
-                for c in range(N):
+            for r in range(rows - 1):
+                for c in range(cols):
                     i = sub2ind(r, c)
                     j = sub2ind(r + 1, c)
                     spring_indices.extend([i, j])
                     spring_lengths.append(spacing)
             
             # Diagonal springs (checkerboard pattern)
-            for r in range(N - 1):
-                for c in range(N - 1):
+            for r in range(rows - 1):
+                for c in range(cols - 1):
                     if (r + c) % 2 == 0:
                         i = sub2ind(r, c)
                         j = sub2ind(r + 1, c + 1)
@@ -526,9 +538,15 @@ class Model:
         
         # Optionally add FEM triangles (split each grid cell into 2 triangles)
         if with_fem:
-            model._add_triangles_from_grid(N)
+            model._add_triangles_from_grid(rows, cols)
         else:
             print("✓ Created spring-only model (no FEM)")
+        
+        # Print grid info
+        if rows == cols:
+            print(f"✓ Created {rows}x{cols} square grid = {n_particles} particles")
+        else:
+            print(f"✓ Created {cols}x{rows} rectangular grid = {n_particles} particles (wide x tall)")
         
         return model
     
@@ -621,7 +639,7 @@ class Model:
         avg_rest_area = np.mean(tri_areas_np) if len(tri_areas_np) > 0 else 0
         print(f"  - FEM: E={E}, nu={nu}, avg_area={avg_rest_area:.6f}")
     
-    def _add_triangles_from_grid(self, N: int):
+    def _add_triangles_from_grid(self, rows: int, cols: int):
         """
         Add FEM triangles to a grid model.
         Each grid cell is split into 2 triangles.
@@ -631,17 +649,18 @@ class Model:
         FEM must use the same pattern for alignment.
         
         Args:
-            N: Grid size (NxN)
+            rows: Number of rows (height)
+            cols: Number of columns (width)
         """
-        def sub2ind(i, j):
-            return i * N + j
+        def sub2ind(r, c):
+            return r * cols + c
         
         tri_indices = []
         
         # For each grid cell, create 2 triangles
         # Use CHECKERBOARD pattern to match spring diagonals!
-        for r in range(N - 1):
-            for c in range(N - 1):
+        for r in range(rows - 1):
+            for c in range(cols - 1):
                 # Get the 4 corners of the cell
                 v0 = sub2ind(r, c)
                 v1 = sub2ind(r, c + 1)
@@ -665,7 +684,7 @@ class Model:
                     # Triangle 2: v2, v1, v3 (counter-clockwise)
                     tri_indices.extend([v2, v1, v3])
         
-        initial_tri_count = (N - 1) * (N - 1) * 2
+        initial_tri_count = (rows - 1) * (cols - 1) * 2
         self.tri_count = initial_tri_count
         tri_indices_np = np.array(tri_indices, dtype=np.int32)
         self.tri_indices = wp.array(tri_indices_np, dtype=int, device=self.device)

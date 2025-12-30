@@ -47,6 +47,8 @@ class HopfCPG:
         direction = None,
         coupling_strength: float = 2.0,
         dt: float = 0.001,
+        group_rows: int = None,
+        group_cols: int = None,
     ):
         """
         Initialize Hopf CPG.
@@ -60,6 +62,8 @@ class HopfCPG:
                        Default: [1, 0] (move right)
             coupling_strength: How strongly oscillators influence each other
             dt: Integration timestep
+            group_rows: Number of group rows (for rectangular grids)
+            group_cols: Number of group columns (for rectangular grids)
         """
         self.num_groups = num_groups
         self.frequency = frequency
@@ -79,8 +83,15 @@ class HopfCPG:
                 raise ValueError(f"Direction cannot be zero")
             self.direction = d / norm
         
-        # Grid layout
-        self.grid_side = int(np.sqrt(num_groups))
+        # Grid layout (support rectangular grids)
+        if group_rows is not None and group_cols is not None:
+            self.grid_rows = group_rows
+            self.grid_cols = group_cols
+        else:
+            # Square grid (backward compatible)
+            side = int(np.sqrt(num_groups))
+            self.grid_rows = side
+            self.grid_cols = side
         
         # Hopf parameters - tuned for fast locomotion
         self.hopf_a = 15.0                         # Fast convergence
@@ -103,13 +114,13 @@ class HopfCPG:
         self.last_output = np.zeros(num_groups)
         
         print(f"[HopfCPG] Initialized:")
-        print(f"  Groups: {num_groups} ({self.grid_side}x{self.grid_side})")
+        print(f"  Groups: {num_groups} ({self.grid_cols}x{self.grid_rows})")
         print(f"  Frequency: {frequency} Hz")
         print(f"  Direction: [{self.direction[0]:.2f}, {self.direction[1]:.2f}]")
         print(f"  Coupling: {coupling_strength}")
         print(f"  Initial phases (degrees):")
         for i in range(min(num_groups, 9)):
-            row, col = i // self.grid_side, i % self.grid_side
+            row, col = i // self.grid_cols, i % self.grid_cols
             print(f"    Group {i} (r{row},c{col}): {np.degrees(self.theta[i]):.1f}°")
     
     def _init_phases(self):
@@ -120,8 +131,8 @@ class HopfCPG:
         phase_per_cell = np.pi / 2.0  # 90° per cell = proper traveling wave
         
         for i in range(self.num_groups):
-            row = i // self.grid_side
-            col = i % self.grid_side
+            row = i // self.grid_cols
+            col = i % self.grid_cols
             
             # Phase gradient: HIGHER phase in direction → wave travels OPPOSITE → body moves WITH direction
             col_phase = col * phase_per_cell * self.direction[0]
@@ -131,20 +142,21 @@ class HopfCPG:
     
     def _build_neighbors(self):
         """Build 4-connected neighbor list for grid layout."""
-        side = self.grid_side
+        rows = self.grid_rows
+        cols = self.grid_cols
         neighbors = [[] for _ in range(self.num_groups)]
         
-        for r in range(side):
-            for c in range(side):
-                i = r * side + c
+        for r in range(rows):
+            for c in range(cols):
+                i = r * cols + c
                 if c > 0:
                     neighbors[i].append(i - 1)      # left
-                if c < side - 1:
+                if c < cols - 1:
                     neighbors[i].append(i + 1)      # right
                 if r > 0:
-                    neighbors[i].append(i - side)   # up
-                if r < side - 1:
-                    neighbors[i].append(i + side)   # down
+                    neighbors[i].append(i - cols)   # up
+                if r < rows - 1:
+                    neighbors[i].append(i + cols)   # down
         
         return neighbors
     
@@ -158,8 +170,8 @@ class HopfCPG:
         
         for i in range(self.num_groups):
             for j in self.neighbors[i]:
-                row_i, col_i = i // self.grid_side, i % self.grid_side
-                row_j, col_j = j // self.grid_side, j % self.grid_side
+                row_i, col_i = i // self.grid_cols, i % self.grid_cols
+                row_j, col_j = j // self.grid_cols, j % self.grid_cols
                 
                 self.phase_coupling[i, j] = self.coupling_strength
                 

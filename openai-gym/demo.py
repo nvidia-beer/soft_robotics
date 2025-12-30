@@ -30,8 +30,10 @@ def main():
                        help='Disable FEM triangles (implicit solver only, spring-only simulation)')
     parser.add_argument('--no-springs', action='store_true',
                        help='Disable springs (FEM-only simulation, requires --implicit)')
-    parser.add_argument('--N', type=int, default=5, 
-                       help='Grid size (NxN particles, ignored if --tessellation is provided)')
+    parser.add_argument('--rows', type=int, default=5, 
+                       help='Grid rows (height, ignored if --tessellation is provided)')
+    parser.add_argument('--cols', type=int, default=5, 
+                       help='Grid cols (width, ignored if --tessellation is provided)')
     parser.add_argument('--tessellation', type=str, default=None,
                        help='Path to tessellation JSON file (e.g., /workspace/tessellation/model.json)')
     parser.add_argument('--circle', action='store_true',
@@ -132,7 +134,7 @@ def main():
     
     env = SpringMassEnv(
         render_mode=render_mode,
-        N=args.N,
+        rows=args.rows, cols=args.cols,
         dt=args.dt,
         spring_coeff=spring_coeff,
         spring_damping=spring_damping,
@@ -207,7 +209,7 @@ def main():
     print("=" * 60)
     print(f"Spring Mass System Demo - {solver_name}")
     print("=" * 60)
-    print(f"Grid size: {env.N}x{env.N} = {env.model.particle_count} nodes")
+    print(f"Grid size: {env.cols}x{env.rows} = {env.model.particle_count} nodes")
     print(f"Number of springs: {env.model.spring_count}")
     print(f"Spring params: k={spring_coeff}, d={spring_damping}")
     

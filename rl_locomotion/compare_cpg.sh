@@ -35,7 +35,8 @@ echo "to verify both produce the same traveling wave pattern."
 echo ""
 
 # Common parameters for fair comparison
-GRID_N=4
+GRID_ROWS=3
+GRID_COLS=6
 FREQUENCY=4.0
 AMPLITUDE=1.0
 FORCE_SCALE=20.0
@@ -44,7 +45,7 @@ DIR_Y=0
 DURATION=20
 
 echo -e "${CYAN}Common Parameters:${NC}"
-echo "  Grid: ${GRID_N}x${GRID_N} ($(( (GRID_N-1)*(GRID_N-1) )) groups)"
+echo "  Grid: ${GRID_COLS}x${GRID_ROWS} ($(( (GRID_ROWS-1)*(GRID_COLS-1) )) groups)"
 echo "  Frequency: ${FREQUENCY} Hz"
 echo "  Amplitude: ${AMPLITUDE}"
 echo "  Direction: (${DIR_X}, ${DIR_Y})"
@@ -88,7 +89,8 @@ run_simple() {
         -w /workspace/rl_locomotion \
         "$IMAGE_NAME" \
         python demo_simple_cpg.py \
-            --grid-size $GRID_N \
+            --rows $GRID_ROWS \
+            --cols $GRID_COLS \
             --frequency $FREQUENCY \
             --amplitude $AMPLITUDE \
             --force-scale $FORCE_SCALE \
@@ -125,7 +127,8 @@ run_snn() {
         -w /workspace/rl_locomotion \
         "$IMAGE_NAME" \
         python demo_snn_simple.py \
-            --grid-size $GRID_N \
+            --rows $GRID_ROWS \
+            --cols $GRID_COLS \
             --frequency $FREQUENCY \
             --amplitude $AMPLITUDE \
             --force-scale $FORCE_SCALE \

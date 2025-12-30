@@ -138,7 +138,7 @@ def run_simulation(args):
     # Create environment
     env = TrackingEnv(
         render_mode=render_mode,
-        N=args.grid_size,
+        rows=args.grid_size, cols=args.grid_size,
         dt=args.dt,
         spring_stiffness=args.spring_k,
         spring_damping=args.spring_c,
@@ -321,7 +321,7 @@ def run_comparison(args):
         
         env = TrackingEnv(
             render_mode=render_mode,
-            N=args.grid_size,
+            rows=args.grid_size, cols=args.grid_size,
             dt=args.dt,
             spring_stiffness=args.spring_k,
             spring_damping=args.spring_c,
@@ -455,7 +455,7 @@ def run_triple_comparison(args):
         
         env = TrackingEnv(
             render_mode=render_mode,
-            N=args.grid_size,
+            rows=args.grid_size, cols=args.grid_size,
             dt=args.dt,
             spring_stiffness=args.spring_k,
             spring_damping=args.spring_c,
@@ -816,8 +816,8 @@ RIGID GRID MODE:
                        help='Run 3-way comparison: PID vs SNN-PID vs SNN-Stress')
     
     # Environment
-    parser.add_argument('--grid-size', '-N', type=int, default=3,
-                       help='Grid size N>=2: N=2→1 group, N=3→4 groups, N=4→9 groups')
+    parser.add_argument('--grid-size', type=int, default=3,
+                       help='Grid size (rows=cols): 2→1 group, 3→4 groups, 4→9 groups')
     parser.add_argument('--dt', type=float, default=0.01,
                        help='Time step (physics dt)')
     parser.add_argument('--nengo-dt', type=float, default=0.001,

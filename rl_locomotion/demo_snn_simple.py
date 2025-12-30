@@ -182,8 +182,10 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Simple SNN CPG Demo')
     
     # Grid configuration
-    parser.add_argument('--grid-size', '-n', type=int, default=4,
-                        help='Grid size NxN (default: 4)')
+    parser.add_argument('--rows', type=int, default=3,
+                        help='Grid rows (height, default: 3)')
+    parser.add_argument('--cols', type=int, default=6,
+                        help='Grid cols (width, default: 6)')
     
     # Physics
     parser.add_argument('--dt', type=float, default=0.01,
@@ -236,7 +238,7 @@ def main():
     
     env = SpringMassEnv(
         render_mode='human',
-        N=args.grid_size,
+        rows=args.rows, cols=args.cols,
         dt=args.dt,
         spring_coeff=50.0,
         spring_damping=0.3,
@@ -280,14 +282,14 @@ def main():
         env.state_in.particle_q = new_pos_wp
         env.state_out.particle_q = wp.clone(new_pos_wp)
     
-    print(f"  Grid: {args.grid_size}x{args.grid_size} = {args.grid_size**2} particles")
+    print(f"  Grid: {args.cols}x{args.rows} = {args.rows*args.cols} particles")
     print(f"  Device: {args.device}")
     print()
     
     # =========================================================================
     # Create SNN CPG
     # =========================================================================
-    num_groups = (args.grid_size - 1) ** 2
+    num_groups = (args.rows - 1) * (args.cols - 1)
     
     cpg = SimpleSNNCPG(
         num_groups=num_groups,

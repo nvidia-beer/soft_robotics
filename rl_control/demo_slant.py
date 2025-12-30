@@ -3,7 +3,7 @@
 Demo: Soft Robot Locomotion on Slanted Terrain
 
 Tests soft robot ability to climb an inclined plane using CPG-based locomotion.
-Default angle: 45 degrees (configurable via --angle)
+Default angle: 20 degrees (configurable via --angle)
 
 Usage:
     python demo_slant.py
@@ -18,6 +18,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import argparse
+import math
 from demo_base import DemoBase, DemoConfig
 from world_map import WorldMap, create_slant_terrain
 
@@ -25,7 +26,7 @@ from world_map import WorldMap, create_slant_terrain
 class SlantDemo(DemoBase):
     """Locomotion demo on slanted terrain."""
     
-    def __init__(self, angle: float = 45.0, config: DemoConfig = None):
+    def __init__(self, angle: float = 20.0, config: DemoConfig = None):
         """
         Initialize slant demo.
         
@@ -36,10 +37,21 @@ class SlantDemo(DemoBase):
         super().__init__(config)
         self.angle = angle
         
-        # Adjust physics for climbing
+        # Adjust physics for smooth climbing
         if self.config:
-            self.config.gravity = -0.8  # Stronger gravity for challenge
-            self.config.force_scale = 25.0
+            self.config.gravity = -0.5  # Normal gravity (friction handles the slope)
+            self.config.force_scale = 20.0
+            self.config.frequency = 4.0  # Standard CPG frequency
+            
+            # IMPORTANT: Keep CPG direction HORIZONTAL for proper wave pattern!
+            self.config.direction = (1.0, 0.0)
+            
+            # Friction direction follows the SLOPE (detects sliding down correctly)
+            angle_rad = math.radians(angle)
+            self.config.friction_direction = (math.cos(angle_rad), math.sin(angle_rad))
+            
+            # Higher backward friction for slopes
+            self.config.mu_backward = 1.5
     
     def create_terrain(self) -> WorldMap:
         """Create slanted terrain."""
@@ -66,6 +78,8 @@ class SlantDemo(DemoBase):
         climb = cy - self.initial_centroid_y
         
         lines.insert(3, (f"Climb height: {climb:+.3f}m", (0, 100, 0)))
+        lines.insert(4, (f"Angle: {self.angle}°", (100, 100, 100)))
+        
         return lines
     
     def get_summary(self) -> dict:
@@ -90,8 +104,8 @@ class SlantDemo(DemoBase):
 
 def main():
     parser = argparse.ArgumentParser(description='Slant Locomotion Demo')
-    parser.add_argument('--angle', type=float, default=45.0,
-                        help='Slant angle in degrees (default: 45)')
+    parser.add_argument('--angle', type=float, default=20.0,
+                        help='Slant angle in degrees (default: 20)')
     DemoBase.add_common_args(parser)
     
     args = parser.parse_args()

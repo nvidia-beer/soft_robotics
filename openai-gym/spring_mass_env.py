@@ -46,7 +46,8 @@ class SpringMassEnv(gym.Env):
     def __init__(
         self, 
         render_mode=None, 
-        N=5, 
+        rows=3,  # Grid height (Y direction)
+        cols=6,  # Grid width (X direction)
         dt=0.1, 
         spring_coeff=40.0, 
         spring_damping=0.5,
@@ -64,18 +65,23 @@ class SpringMassEnv(gym.Env):
         
         Args:
             render_mode: 'human', 'rgb_array', or None
-            N: Number of nodes per linear dimension (creates NxN grid)
+            rows: Grid height (number of rows, Y direction). Default 4.
+            cols: Grid width (number of columns, X direction). Default 4.
             dt: Physics timestep
             spring_coeff: Spring stiffness (uniform if model not provided)
             spring_damping: Spring damping (uniform if model not provided)
             gravity: Gravity strength (negative = downward)
             boxsize: Size of simulation box
             device: Warp device ('cuda' or 'cpu')
-            model: Optional pre-built Model object (overrides N, spring_coeff, etc.)
+            model: Optional pre-built Model object (overrides rows/cols, etc.)
             with_fem: Enable/disable FEM triangles
             with_springs: Enable/disable springs
             window_width: Window width in pixels
             window_height: Window height in pixels
+        
+        Examples:
+            >>> env = SpringMassEnv()                 # 3x6 default (stable)
+            >>> env = SpringMassEnv(rows=4, cols=4)   # 4x4 square grid
         """
         super(SpringMassEnv, self).__init__()
         
@@ -84,7 +90,8 @@ class SpringMassEnv(gym.Env):
         self.device = device
         
         # Physics parameters
-        self.N = N
+        self.rows = rows
+        self.cols = cols
         self.dt = dt
         self.boxsize = boxsize
         
@@ -113,7 +120,11 @@ class SpringMassEnv(gym.Env):
             particle_spacing = 1.0 / (5 - 1)  # Reference spacing from N=5
             
             # Create model using grid builder
-            self.model = Model.from_grid(N=N, spacing=particle_spacing, device=device, boxsize=boxsize, with_fem=with_fem, with_springs=with_springs)
+            self.model = Model.from_grid(
+                rows=rows, cols=cols, spacing=particle_spacing, 
+                device=device, boxsize=boxsize, 
+                with_fem=with_fem, with_springs=with_springs
+            )
             
             # Set custom properties
             self.model.spring_stiffness.fill_(spring_coeff)
@@ -121,7 +132,14 @@ class SpringMassEnv(gym.Env):
             self.model.set_gravity((0.0, gravity))
         else:
             self.model = model
-            self.N = int(np.sqrt(model.particle_count))  # Assume square grid
+            if hasattr(model, 'grid_rows') and hasattr(model, 'grid_cols'):
+                self.rows = model.grid_rows
+                self.cols = model.grid_cols
+            else:
+                # Assume square grid from particle count
+                n = int(np.sqrt(model.particle_count))
+                self.rows = n
+                self.cols = n
         
         
         # Create solver

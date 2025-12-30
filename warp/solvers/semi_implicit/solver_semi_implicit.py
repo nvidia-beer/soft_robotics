@@ -26,7 +26,7 @@ class SolverSemiImplicit(SolverBase):
     Adapted from newton.solvers.SolverSemiImplicit for 2D systems.
     
     Example:
-        >>> model = Model.from_grid(N=5, spacing=0.25)
+        >>> model = Model.from_grid(rows=5, cols=5, spacing=0.25)
         >>> solver = SolverSemiImplicit(model)
         >>> state_in = model.state()
         >>> state_out = model.state()

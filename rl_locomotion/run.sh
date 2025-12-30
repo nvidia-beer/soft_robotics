@@ -31,7 +31,7 @@ IMAGE_NAME="spring-mass-nengo"
 
 # Quick config or custom
 echo -e "${BLUE}Configuration:${NC}"
-echo "  1) Quick test (defaults: 4x4 grid, radial mode, friction=0.5)"
+echo "  1) Quick test (defaults: 3x6 grid, radial mode, friction=0.5)"
 echo "  2) Custom configuration"
 echo ""
 read -p "Select [1/2] (default: 1): " config_choice
@@ -40,8 +40,10 @@ config_choice=${config_choice:-1}
 if [ "$config_choice" == "2" ]; then
     # Custom configuration
     echo ""
-    read -p "Grid size N (default: 4): " grid_n
-    grid_n=${grid_n:-4}
+    read -p "Grid rows (height, default: 3): " grid_rows
+    grid_rows=${grid_rows:-3}
+    read -p "Grid cols (width, default: 6): " grid_cols
+    grid_cols=${grid_cols:-6}
     
     read -p "CPG frequency Hz (default: 4.0): " frequency
     frequency=${frequency:-4.0}
@@ -66,7 +68,8 @@ if [ "$config_choice" == "2" ]; then
     duration=${duration:-30}
 else
     # Quick defaults
-    grid_n=4
+    grid_rows=3
+    grid_cols=6
     frequency=4.0
     amplitude=1.0
     force_scale=20.0
@@ -78,7 +81,7 @@ fi
 echo ""
 echo "========================================================================"
 echo -e "${GREEN}Configuration Summary:${NC}"
-echo "  Grid: ${grid_n}x${grid_n}"
+echo "  Grid: ${grid_cols}x${grid_rows} (wide x tall)"
 echo "  Force mode: radial (balloon)"
 echo "  Direction: (${dir_x}, ${dir_y})"
 echo "  Ratchet friction: enabled"
@@ -94,7 +97,8 @@ echo ""
 
 # Build command
 CMD="python demo_simple_cpg.py \
-    --grid-size ${grid_n} \
+    --rows ${grid_rows} \
+    --cols ${grid_cols} \
     --direction ${dir_x} ${dir_y} \
     --frequency ${frequency} \
     --amplitude ${amplitude} \

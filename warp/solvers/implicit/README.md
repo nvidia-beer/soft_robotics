@@ -130,7 +130,7 @@ from solvers import SolverImplicit
 wp.init()
 
 # Create model
-model = Model.from_grid(N=10, spacing=0.2, device='cuda')
+model = Model.from_grid(rows=10, cols=10, spacing=0.2, device='cuda')
 
 # Create implicit solver
 solver = SolverImplicit(
@@ -215,7 +215,7 @@ from solvers import SolverImplicit
 from sim import Model
 
 # Create custom model
-model = Model.from_grid(N=10, spacing=0.2)
+model = Model.from_grid(rows=10, cols=10, spacing=0.2)
 
 # Create solver
 solver = SolverImplicit(model, dt=0.01, solver_type="bicgstab")

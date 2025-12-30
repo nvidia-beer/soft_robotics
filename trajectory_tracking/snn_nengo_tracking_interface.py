@@ -127,7 +127,8 @@ class SNNTrackingInterface:
         # Get dimensions from environment
         self.num_groups = env.num_groups
         self.output_dim = self.num_groups * 2  # fx, fy per group
-        self.N = env.N  # Grid size
+        self.rows = env.rows  # Grid rows
+        self.cols = env.cols  # Grid cols
         
         # Count strain inputs
         self._count_strain_inputs()
@@ -196,7 +197,7 @@ class SNNTrackingInterface:
         
         if verbose:
             print(f"\n[SNNTrackingInterface] Initialized:")
-            print(f"  Grid: {self.N}×{self.N}")
+            print(f"  Grid: {self.cols}×{self.rows}")
             print(f"  Groups: {self.num_groups}")
             print(f"  Springs: {self.n_spring_strains}")
             print(f"  FEM triangles: {self.n_fem_strains}")
@@ -216,8 +217,8 @@ class SNNTrackingInterface:
     
     def _setup_strain_groups(self):
         """Assign springs and FEMs to groups (2x2 overlapping)."""
-        N = self.N
-        num_groups_per_side = N - 1
+        rows, cols = self.rows, self.cols
+        num_groups_cols = cols - 1  # Groups per row
         
         # Get spring indices
         spring_indices = self.model.spring_indices.numpy() if hasattr(self.model, 'spring_indices') else np.array([])
@@ -225,17 +226,17 @@ class SNNTrackingInterface:
         
         # Helper: particle index to grid position
         def particle_to_grid(idx):
-            return (idx // N, idx % N)
+            return (idx // cols, idx % cols)
         
         # Helper: get groups a particle belongs to
         def get_particle_groups(idx):
             row, col = particle_to_grid(idx)
             groups = []
-            if row < N-1 and col < N-1:
+            if row < rows-1 and col < cols-1:
                 groups.append((row, col))
-            if row < N-1 and col > 0:
+            if row < rows-1 and col > 0:
                 groups.append((row, col-1))
-            if row > 0 and col < N-1:
+            if row > 0 and col < cols-1:
                 groups.append((row-1, col))
             if row > 0 and col > 0:
                 groups.append((row-1, col-1))
@@ -252,7 +253,7 @@ class SNNTrackingInterface:
             groups1 = set(get_particle_groups(p1))
             common = groups0 & groups1
             for (gr, gc) in common:
-                gid = gr * num_groups_per_side + gc
+                gid = gr * num_groups_cols + gc
                 if gid < self.num_groups:
                     self.spring_groups[gid].append(spring_idx // 2)
         
@@ -267,7 +268,7 @@ class SNNTrackingInterface:
             groups2 = set(get_particle_groups(p2))
             common = groups0 & groups1 & groups2
             for (gr, gc) in common:
-                gid = gr * num_groups_per_side + gc
+                gid = gr * num_groups_cols + gc
                 if gid < self.num_groups:
                     self.fem_groups[gid].append(fem_idx // 3)
         
@@ -340,7 +341,8 @@ class SNNTrackingInterface:
             print(f"\n[SNNTrackingInterface] Building Nengo network '{label}'...")
         
         self.net = nengo.Network(label=label)
-        num_groups_per_side = self.N - 1
+        num_groups_rows = self.rows - 1
+        num_groups_cols = self.cols - 1
         
         with self.net:
             # Main input node: provides full state (for controllers)
@@ -366,7 +368,7 @@ class SNNTrackingInterface:
             
             # Build per-strain ensembles (for visualization)
             if build_strain_ensembles and self.n_total_strains > 0:
-                self._build_strain_ensembles(num_groups_per_side)
+                self._build_strain_ensembles(num_groups_cols)
         
         if self.verbose:
             print(f"  ✓ Created input node: {self.input_dim}D")
@@ -377,7 +379,7 @@ class SNNTrackingInterface:
                 print(f"  ✓ Created {len(self.group_strain_ensembles)} group average ensembles")
             print(f"  → Connect your controller: input_node → [ensemble] → output_node")
     
-    def _build_strain_ensembles(self, num_groups_per_side: int):
+    def _build_strain_ensembles(self, num_groups_cols: int):
         """Build per-strain and group-averaged ensembles."""
         
         # Per-strain ensembles (like rate-coding interface)
@@ -431,8 +433,8 @@ class SNNTrackingInterface:
             if len(group_strain_indices) == 0:
                 continue
             
-            group_row = group_id // num_groups_per_side
-            group_col = group_id % num_groups_per_side
+            group_row = group_id // num_groups_cols
+            group_col = group_id % num_groups_cols
             
             avg_ensemble = nengo.Ensemble(
                 n_neurons=100,
@@ -674,7 +676,7 @@ class SNNTrackingInterface:
         print("\n" + "=" * 70)
         print("SNNTrackingInterface Summary")
         print("=" * 70)
-        print(f"Grid: {self.N}×{self.N}")
+        print(f"Grid: {self.cols}×{self.rows}")
         print(f"Groups: {self.num_groups}")
         print(f"Spring inputs: {self.n_spring_strains}")
         print(f"FEM inputs: {self.n_fem_strains}")

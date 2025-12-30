@@ -38,8 +38,10 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Simple CPG Demo - No SNN')
     
     # Grid configuration
-    parser.add_argument('--grid-size', '-n', type=int, default=4,
-                        help='Grid size NxN (default: 4)')
+    parser.add_argument('--rows', type=int, default=3,
+                        help='Grid rows (height, default: 3)')
+    parser.add_argument('--cols', type=int, default=6,
+                        help='Grid cols (width, default: 6)')
     
     # Physics
     parser.add_argument('--dt', type=float, default=0.01,
@@ -94,7 +96,7 @@ def main():
     
     env = SpringMassEnv(
         render_mode='human',
-        N=args.grid_size,
+        rows=args.rows, cols=args.cols,
         dt=args.dt,
         spring_coeff=50.0,      # Moderate stiffness - solid but deformable
         spring_damping=0.3,     # Moderate damping
@@ -148,7 +150,7 @@ def main():
         max_y_initial = np.max(initial_pos[:, 1])
         print(f"  New Y range: [{min_y_initial:.3f}, {max_y_initial:.3f}]")
     
-    print(f"  Grid: {args.grid_size}x{args.grid_size} = {args.grid_size**2} particles")
+    print(f"  Grid: {args.cols}x{args.rows} = {args.rows*args.cols} particles")
     print(f"  Device: {args.device}")
     print(f"  Ratchet friction: enabled")
     print()
@@ -156,10 +158,14 @@ def main():
     # =========================================================================
     # Create CPG
     # =========================================================================
-    num_groups = (args.grid_size - 1) ** 2
+    group_rows = args.rows - 1
+    group_cols = args.cols - 1
+    num_groups = group_rows * group_cols
     
     cpg = HopfCPG(
         num_groups=num_groups,
+        group_rows=group_rows,
+        group_cols=group_cols,
         frequency=args.frequency,
         amplitude=args.amplitude,
         direction=args.direction,
@@ -292,13 +298,12 @@ def main():
             total_fy_actual = np.sum(forces[:, 1])
             print(f"\n[CLASSIC CPG] t={t:.2f}s")
             print(f"  Forces: max={max_force:.4f}, sum_fx={total_fx_actual:.4f}, sum_fy={total_fy_actual:.4f}")
-            # Print CPG matrix
-            grid_side = int(np.sqrt(num_groups))
-            print(f"  CPG Matrix ({grid_side}x{grid_side}):")
-            for row in range(grid_side - 1, -1, -1):  # Top to bottom
+            # Print CPG matrix (cols x rows)
+            print(f"  CPG Matrix ({group_cols}x{group_rows}):")
+            for row in range(group_rows - 1, -1, -1):  # Top to bottom
                 row_vals = []
-                for col in range(grid_side):
-                    gid = row * grid_side + col
+                for col in range(group_cols):
+                    gid = row * group_cols + col
                     row_vals.append(f"{cpg_output[gid]:+.2f}")
                 print(f"    [{' '.join(row_vals)}]")
         
@@ -332,8 +337,6 @@ def main():
             
             # Step 2: Draw CPG overlays using shared Renderer
             if injector.centroids is not None:
-                group_side = int(np.sqrt(num_groups))
-                
                 # Draw group centroids with labels (hot pink)
                 renderer.draw_group_centroids(canvas, injector.centroids)
                 
@@ -351,9 +354,10 @@ def main():
                 renderer.draw_group_forces_matrix(
                     canvas,
                     cpg_output,
-                    group_side,
+                    group_cols,
                     title="CPG:",
                     direction=np.array(args.direction),
+                    group_rows=group_rows,
                 )
             
             # Step 3: Blit and flip

@@ -34,15 +34,16 @@ from cpg import HopfCPG
 from balloon_forces import BalloonForces
 from pygame_renderer import Renderer
 from solvers import SolverImplicit
-from world import apply_sdf_boundary_with_friction_2d
+from world import apply_sdf_boundary_with_friction_2d, apply_sdf_boundary_anisotropic_friction_2d
 from world_map import WorldMap
 
 
 @dataclass
 class DemoConfig:
     """Configuration for a locomotion demo."""
-    # Grid
-    grid_size: int = 4
+    # Grid (3x6 = wide and short for stability)
+    rows: int = 3
+    cols: int = 6
     
     # Physics
     dt: float = 0.01
@@ -75,6 +76,21 @@ class DemoConfig:
     # Collision
     ratchet_friction: bool = True
     restitution: float = 0.0
+    
+    # Anisotropic friction - ENABLED BY DEFAULT
+    # Uses Coulomb friction model with different coefficients for forward vs backward.
+    # This is how real soft robots work (like caterpillars/worms).
+    anisotropic_friction: bool = True
+    mu_forward: float = 0.15   # Low friction when moving forward (slides easily)
+    mu_backward: float = 1.2   # High friction when moving backward (grips firmly)
+    
+    # Separate friction direction (for slopes)
+    # If None, uses self.direction. Set explicitly for slopes where CPG direction
+    # should be horizontal (1,0) but friction should detect motion along slope.
+    friction_direction: Tuple[float, float] = None
+    
+    # Debug
+    debug_sdf_collision: bool = True  # Show SDF collision points (cyan circles + normals)
 
 
 class DemoBase(ABC):
@@ -183,13 +199,22 @@ class DemoBase(ABC):
         dx = cx - self.initial_centroid_x
         dy = cy - self.initial_centroid_y
         
-        return [
+        lines = [
             (self.get_demo_name(), (0, 0, 0)),
             (f"Time: {self.t:.1f}s", (0, 0, 0)),
             (f"X displacement: {dx:+.3f}m", (0, 0, 0)),
             (f"Y displacement: {dy:+.3f}m", (0, 0, 0)),
             (f"CPG: {self.config.frequency}Hz", (100, 100, 100)),
         ]
+        
+        # Show friction mode (for all demos) - ASCII safe
+        if self.config.anisotropic_friction:
+            friction_text = f"Friction: fwd={self.config.mu_forward:.2f} back={self.config.mu_backward:.2f}"
+            lines.append((friction_text, (200, 100, 0)))  # Orange
+        else:
+            lines.append(("Friction: ratchet", (100, 100, 100)))
+        
+        return lines
     
     def on_step(self, positions: np.ndarray, cpg_output: np.ndarray) -> None:
         """
@@ -259,7 +284,9 @@ class DemoBase(ABC):
         self.sdf_grad_y_wp = wp.array2d(data['sdf_grad_y'], dtype=float, device=cfg.device)
         
         # Forward direction for ratchet friction
-        self.forward_dir_wp = wp.vec2(float(cfg.direction[0]), float(cfg.direction[1]))
+        # Use friction_direction if set, otherwise fall back to direction
+        friction_dir = cfg.friction_direction if cfg.friction_direction else cfg.direction
+        self.forward_dir_wp = wp.vec2(float(friction_dir[0]), float(friction_dir[1]))
         
         # Debug: check SDF range
         sdf_min = float(data['sdf'].min())
@@ -269,7 +296,12 @@ class DemoBase(ABC):
         print(f"    Size: {self.sdf_width}x{self.sdf_height} pixels")
         print(f"    Resolution: {self.sdf_resolution} px/unit")
         print(f"    SDF range: [{sdf_min:.1f}, {sdf_max:.1f}] (negative = wall)")
-        print(f"    Ratchet friction: {'enabled' if cfg.ratchet_friction else 'disabled'}")
+        if cfg.anisotropic_friction:
+            friction_dir = cfg.friction_direction if cfg.friction_direction else cfg.direction
+            print(f"    Friction: ANISOTROPIC (μ_fwd={cfg.mu_forward:.2f}, μ_back={cfg.mu_backward:.2f})")
+            print(f"    Friction direction: ({friction_dir[0]:.2f}, {friction_dir[1]:.2f})")
+        else:
+            print(f"    Ratchet friction: {'enabled' if cfg.ratchet_friction else 'disabled'}")
     
     def _apply_sdf_collision(self) -> None:
         """Apply SDF collision after physics step."""
@@ -278,26 +310,52 @@ class DemoBase(ABC):
         if self.sdf_wp is None:
             return
         
-        wp.launch(
-            kernel=apply_sdf_boundary_with_friction_2d,
-            dim=self.env.model.particle_count,
-            inputs=[
-                self.env.state_in.particle_q,
-                self.env.state_in.particle_qd,
-                self.sdf_wp,
-                self.sdf_grad_x_wp,
-                self.sdf_grad_y_wp,
-                self.sdf_resolution,
-                self.sdf_origin_x,
-                self.sdf_origin_y,
-                self.sdf_width,
-                self.sdf_height,
-                cfg.restitution,
-                self.forward_dir_wp,
-                1 if cfg.ratchet_friction else 0,
-            ],
-            device=self.env.model.device,
-        )
+        if cfg.anisotropic_friction:
+            # Use anisotropic Coulomb friction (better for slopes)
+            wp.launch(
+                kernel=apply_sdf_boundary_anisotropic_friction_2d,
+                dim=self.env.model.particle_count,
+                inputs=[
+                    self.env.state_in.particle_q,
+                    self.env.state_in.particle_qd,
+                    self.sdf_wp,
+                    self.sdf_grad_x_wp,
+                    self.sdf_grad_y_wp,
+                    self.sdf_resolution,
+                    self.sdf_origin_x,
+                    self.sdf_origin_y,
+                    self.sdf_width,
+                    self.sdf_height,
+                    cfg.restitution,
+                    self.forward_dir_wp,
+                    cfg.mu_forward,
+                    cfg.mu_backward,
+                    cfg.dt,
+                ],
+                device=self.env.model.device,
+            )
+        else:
+            # Use simple ratchet friction (original behavior)
+            wp.launch(
+                kernel=apply_sdf_boundary_with_friction_2d,
+                dim=self.env.model.particle_count,
+                inputs=[
+                    self.env.state_in.particle_q,
+                    self.env.state_in.particle_qd,
+                    self.sdf_wp,
+                    self.sdf_grad_x_wp,
+                    self.sdf_grad_y_wp,
+                    self.sdf_resolution,
+                    self.sdf_origin_x,
+                    self.sdf_origin_y,
+                    self.sdf_width,
+                    self.sdf_height,
+                    cfg.restitution,
+                    self.forward_dir_wp,
+                    1 if cfg.ratchet_friction else 0,
+                ],
+                device=self.env.model.device,
+            )
     
     def setup(self) -> None:
         """Initialize environment, terrain, CPG, and renderer."""
@@ -305,10 +363,13 @@ class DemoBase(ABC):
         
         # Calculate robot dimensions
         particle_spacing = 1.0 / (5 - 1)  # Reference spacing
-        self.robot_height = (cfg.grid_size - 1) * particle_spacing
-        self.robot_size = self.robot_height
+        self.robot_height = (cfg.rows - 1) * particle_spacing
+        self.robot_width = (cfg.cols - 1) * particle_spacing
+        self.robot_size = self.robot_height  # Use height for obstacle scaling
         self.world_width = cfg.boxsize * (cfg.window_width / cfg.window_height)
-        self.num_groups = (cfg.grid_size - 1) ** 2
+        self.group_rows = cfg.rows - 1
+        self.group_cols = cfg.cols - 1
+        self.num_groups = self.group_rows * self.group_cols
         
         print("=" * 70)
         print(self.get_demo_name())
@@ -325,7 +386,7 @@ class DemoBase(ABC):
         print("Creating environment...")
         self.env = SpringMassEnv(
             render_mode='human',
-            N=cfg.grid_size,
+            rows=cfg.rows, cols=cfg.cols,
             dt=cfg.dt,
             spring_coeff=cfg.spring_coeff,
             spring_damping=cfg.spring_damping,
@@ -360,7 +421,7 @@ class DemoBase(ABC):
         # Position robot
         self._position_robot()
         
-        print(f"  Grid: {cfg.grid_size}x{cfg.grid_size} = {cfg.grid_size**2} particles")
+        print(f"  Grid: {cfg.cols}x{cfg.rows} = {cfg.rows*cfg.cols} particles")
         print()
         
         # Create CPG
@@ -371,6 +432,8 @@ class DemoBase(ABC):
             direction=list(cfg.direction),
             coupling_strength=cfg.coupling_strength,
             dt=cfg.dt,
+            group_rows=self.group_rows,
+            group_cols=self.group_cols,
         )
         print(f"CPG: {cfg.frequency} Hz, amplitude {cfg.amplitude}")
         print()
@@ -488,6 +551,19 @@ class DemoBase(ABC):
         self.env._draw_springs(canvas, scale)
         self.env._draw_particles(canvas, scale)
         
+        # Debug: SDF collision visualization
+        if cfg.debug_sdf_collision and self.terrain is not None:
+            positions = self.env.state_in.particle_q.numpy()
+            self.renderer.draw_sdf_collision_debug(
+                canvas,
+                positions,
+                self.terrain.sdf,
+                self.terrain.sdf_grad_x,
+                self.terrain.sdf_grad_y,
+                self.terrain.resolution,
+                origin=(self.sdf_origin_x, self.sdf_origin_y),
+            )
+        
         # Draw CPG overlays
         if self.injector.centroids is not None:
             self.renderer.draw_group_centroids(canvas, self.injector.centroids)
@@ -499,6 +575,16 @@ class DemoBase(ABC):
                         cpg_output[gid],
                         num_directions=4,
                     )
+            
+            # Draw CPG matrix display with direction indicator (bottom-right)
+            self.renderer.draw_group_forces_matrix(
+                canvas,
+                cpg_output,
+                self.group_cols,
+                title="CPG:",
+                direction=np.array(self.config.direction),
+                group_rows=self.group_rows,
+            )
         
         # Draw info HUD
         font = pygame.font.Font(None, 28)
@@ -584,8 +670,10 @@ class DemoBase(ABC):
     @classmethod
     def add_common_args(cls, parser: argparse.ArgumentParser) -> None:
         """Add common command-line arguments to parser."""
-        parser.add_argument('--grid-size', '-n', type=int, default=4,
-                            help='Grid size NxN (default: 4)')
+        parser.add_argument('--rows', type=int, default=3,
+                            help='Grid rows/height (default: 3)')
+        parser.add_argument('--cols', type=int, default=6,
+                            help='Grid columns/width (default: 6)')
         parser.add_argument('--dt', type=float, default=0.01,
                             help='Time step (default: 0.01)')
         parser.add_argument('--device', type=str, default='cuda',
@@ -604,12 +692,17 @@ class DemoBase(ABC):
                             help='Simulation box height (default: 2.5)')
         parser.add_argument('--duration', '-t', type=float, default=60.0,
                             help='Simulation duration in seconds (default: 60)')
+        parser.add_argument('--debug-sdf', action='store_true', default=True,
+                            help='Show SDF collision debug visualization (default: on)')
+        parser.add_argument('--no-debug-sdf', action='store_true',
+                            help='Disable SDF collision debug visualization')
     
     @classmethod
     def config_from_args(cls, args) -> DemoConfig:
         """Create DemoConfig from parsed arguments."""
         return DemoConfig(
-            grid_size=args.grid_size,
+            rows=args.rows,
+            cols=args.cols,
             dt=args.dt,
             device=args.device,
             frequency=args.frequency,
@@ -619,4 +712,5 @@ class DemoBase(ABC):
             window_height=args.window_height,
             boxsize=args.boxsize,
             duration=args.duration,
+            debug_sdf_collision=not getattr(args, 'no_debug_sdf', False),
         )

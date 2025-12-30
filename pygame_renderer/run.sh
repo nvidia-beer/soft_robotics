@@ -40,7 +40,7 @@ IMAGE_NAME="spring-mass-nengo"
 
 # Configuration
 echo -e "${BLUE}Configuration:${NC}"
-echo "  1) Quick test (defaults: 4x4 grid, FEM enabled)"
+echo "  1) Quick test (defaults: 3x6 grid, FEM enabled)"
 echo "  2) Custom configuration"
 echo ""
 read -p "Select [1/2] (default: 1): " config_choice
@@ -50,8 +50,10 @@ if [ "$config_choice" == "2" ]; then
     # Custom configuration
     echo ""
     echo -e "${BLUE}Grid Configuration:${NC}"
-    read -p "Grid size N (NxN particles, default: 4): " grid_n
-    grid_n=${grid_n:-4}
+    read -p "Grid rows (height, default: 3): " grid_rows
+    grid_rows=${grid_rows:-3}
+    read -p "Grid cols (width, default: 6): " grid_cols
+    grid_cols=${grid_cols:-6}
     
     echo ""
     echo -e "${BLUE}Visualization Options:${NC}"
@@ -80,7 +82,8 @@ if [ "$config_choice" == "2" ]; then
     duration=${duration:-30}
 else
     # Quick defaults
-    grid_n=4
+    grid_rows=3
+    grid_cols=6
     use_fem="y"
     use_sdf="y"
     winwidth=1000
@@ -102,7 +105,7 @@ fi
 echo ""
 echo "========================================================================"
 echo -e "${GREEN}Configuration Summary:${NC}"
-echo "  Grid: ${grid_n}x${grid_n}"
+echo "  Grid: ${grid_cols}x${grid_rows} (wide x tall)"
 echo "  FEM: $([ "$use_fem" == "y" ] && echo "Enabled" || echo "Disabled")"
 echo "  SDF + Collision: $([ "$use_sdf" == "y" ] && echo "Enabled (brown walls)" || echo "Disabled")"
 echo "  Window: ${winwidth}×${winheight}"
@@ -121,6 +124,7 @@ echo "  ✓ Group forces matrix display"
 if [ "$use_sdf" == "y" ]; then
     echo "  ✓ SDF background (brown=walls, white=passable)"
     echo "  ✓ Collision with walls (particles bounce off brown areas)"
+    echo "  ✓ Collision debug (blue=safe, cyan=near, green=colliding)"
 fi
 echo "========================================================================"
 echo ""
@@ -129,7 +133,8 @@ echo ""
 
 # Build command
 CMD="python test_renderer.py \
-    --grid-size ${grid_n} \
+    --rows ${grid_rows} \
+    --cols ${grid_cols} \
     --window-width ${winwidth} \
     --window-height ${winheight} \
     --boxsize ${boxsize} \

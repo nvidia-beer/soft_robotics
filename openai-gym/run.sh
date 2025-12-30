@@ -25,7 +25,7 @@ IMAGE_NAME="spring-mass-nengo"
 echo -e "${BLUE}Select model type:${NC}"
 echo "  1) Tessellation (load from JSON file)"
 echo "  2) Circle (procedural circular mesh)"
-echo "  3) Grid (regular NxN grid)"
+echo "  3) Grid (rows x cols grid)"
 echo ""
 read -p "Enter choice [1-3] (default: 1): " model_choice
 model_choice=${model_choice:-1}
@@ -56,10 +56,12 @@ case $model_choice in
     3)
         echo ""
         echo -e "${BLUE}Grid Mode${NC}"
-        read -p "Grid size N (NxN particles, default: 10): " grid_n
-        grid_n=${grid_n:-10}
-        MODEL_ARGS="--N ${grid_n}"
-        echo "  Model: ${grid_n}x${grid_n} grid"
+        read -p "Grid rows (height, default: 3): " grid_rows
+        grid_rows=${grid_rows:-3}
+        read -p "Grid cols (width, default: 6): " grid_cols
+        grid_cols=${grid_cols:-6}
+        MODEL_ARGS="--rows ${grid_rows} --cols ${grid_cols}"
+        echo "  Model: ${grid_cols}x${grid_rows} grid (wide x tall)"
         ;;
     *)
         echo "Invalid choice, using tessellation mode"
@@ -162,7 +164,7 @@ echo -e "${GREEN}Configuration Summary:${NC}"
 case $model_choice in
     1) echo "  Model: Tessellation from ${tess_file}" ;;
     2) echo "  Model: Circle (r=${radius}, boundary=${num_boundary}, rings=${num_rings})" ;;
-    3) echo "  Model: ${grid_n}x${grid_n} grid" ;;
+    3) echo "  Model: ${grid_cols}x${grid_rows} grid (wide x tall)" ;;
 esac
 case $solver_choice in
     1) echo "  Solver: Semi-Implicit (springs only)" ;;

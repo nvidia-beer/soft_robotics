@@ -7,7 +7,9 @@ A modular, extensible framework for soft robot locomotion testing with SDF (Sign
 ```
 rl_control/                    # Locomotion demos
 ├── demo_base.py               # DemoBase class - extend for new demos
-├── demo_slant.py              # Slant climbing demo
+├── demo_plane.py              # Flat ground demo
+├── demo_slant.py              # Slant climbing demo (with flat start)
+├── demo_angled_plane.py       # Uniformly tilted plane (no flat start)
 ├── demo_tunnel.py             # Tunnel squeeze demo
 ├── demo_boulder.py            # Boulder climbing demo
 └── run.sh                     # Interactive launcher
@@ -86,6 +88,16 @@ Climb over a semicircular obstacle.
 ```bash
 python -m demo_boulder --boulder-ratio 0.5
 python -m demo_boulder --boulder-ratio 0.7 --frequency 3.0
+```
+
+### 5. Angled Plane Demo (`demo_angled_plane.py`)
+Locomotion on a uniformly tilted plane at 20° (default). Unlike Slant demo,
+this has NO flat starting section - the entire surface is tilted from x=0.
+
+```bash
+python demo_angled_plane.py                 # Default: 20° angle
+python demo_angled_plane.py --angle 30      # 30° tilt
+python demo_angled_plane.py --angle 15 --frequency 3.0
 ```
 
 ## Quick Start
