@@ -96,8 +96,8 @@ class Renderer:
         window_width: int = 1000,
         window_height: int = 500,
         boxsize: float = 2.5,
-        particle_radius: int = 5,
-        particle_outline: int = 7,
+        particle_radius: int = 4,
+        particle_outline: int = 5,
         centroid_radius: int = 8,
         centroid_outline: int = 10,
         spring_min_width: int = 3,
@@ -392,6 +392,7 @@ class Renderer:
         positions: np.ndarray,
         fill_color=None,
         outline_color=None,
+        per_particle_colors: Optional[np.ndarray] = None,
     ):
         """
         Draw particles as circles with outlines.
@@ -399,19 +400,96 @@ class Renderer:
         Args:
             canvas: pygame Surface to draw on
             positions: Array of shape (N, 2) with particle positions
-            fill_color: Particle fill color (default: blue)
+            fill_color: Particle fill color (default: blue), used when per_particle_colors is None
             outline_color: Particle outline color (default: black)
+            per_particle_colors: Optional array of shape (N, 3) with RGB colors per particle
         """
-        fill_color = fill_color or self.PARTICLE_FILL
+        default_fill = fill_color or self.PARTICLE_FILL
         outline_color = outline_color or self.PARTICLE_OUTLINE
         
-        for pos in positions:
+        for i, pos in enumerate(positions):
             if np.isnan(pos[0]) or np.isnan(pos[1]):
                 continue
             
+            # Use per-particle color if provided, otherwise default
+            if per_particle_colors is not None:
+                fill = tuple(per_particle_colors[i].astype(int))
+            else:
+                fill = default_fill
+            
             screen_pos = self.world_to_screen(pos[0], pos[1])
             pygame.draw.circle(canvas, outline_color, screen_pos, self.particle_outline)
-            pygame.draw.circle(canvas, fill_color, screen_pos, self.particle_radius)
+            pygame.draw.circle(canvas, fill, screen_pos, self.particle_radius)
+    
+    # Collision indicator colors
+    COLLISION_COLOR = (255, 105, 180)  # Hot pink (#FF69B4)
+    SAFE_COLOR = (50, 50, 255)         # Blue (same as PARTICLE_FILL)
+    
+    def compute_particle_collision_colors(
+        self,
+        positions: np.ndarray,
+        sdf: np.ndarray,
+        resolution: float,
+        origin: Tuple[float, float] = (0.0, 0.0),
+        near_threshold: float = 0.1,
+    ) -> np.ndarray:
+        """
+        Compute per-particle colors based on SDF proximity.
+        
+        Particles near or touching the SDF boundary are colored hot pink,
+        others are light blue (like in the notebook).
+        
+        Args:
+            positions: Array of shape (N, 2) with particle positions
+            sdf: Signed distance field array
+            resolution: Pixels per world unit
+            origin: World coordinates of SDF origin (x, y)
+            near_threshold: Distance threshold for "near collision" in world units
+            
+        Returns:
+            Array of shape (N, 3) with RGB colors per particle
+        """
+        n_particles = len(positions)
+        colors = np.zeros((n_particles, 3), dtype=np.uint8)
+        
+        sdf_height, sdf_width = sdf.shape
+        
+        for i, pos in enumerate(positions):
+            if np.isnan(pos[0]) or np.isnan(pos[1]):
+                colors[i] = self.SAFE_COLOR
+                continue
+            
+            # Convert world to SDF pixel coordinates
+            px = (pos[0] - origin[0]) * resolution
+            py = (pos[1] - origin[1]) * resolution
+            
+            # Check bounds
+            if px < 0 or px >= sdf_width or py < 0 or py >= sdf_height:
+                colors[i] = self.SAFE_COLOR
+                continue
+            
+            # Sample SDF with bilinear interpolation
+            x0, y0 = int(px), int(py)
+            x1 = min(x0 + 1, sdf_width - 1)
+            y1 = min(y0 + 1, sdf_height - 1)
+            fx, fy = px - x0, py - y0
+            
+            v00 = sdf[y0, x0]
+            v01 = sdf[y0, x1]
+            v10 = sdf[y1, x0]
+            v11 = sdf[y1, x1]
+            
+            v0 = v00 * (1 - fx) + v01 * fx
+            v1 = v10 * (1 - fx) + v11 * fx
+            sdf_value = (v0 * (1 - fy) + v1 * fy) / resolution  # Convert to world units
+            
+            # Color based on proximity to boundary
+            if sdf_value < near_threshold:
+                colors[i] = self.COLLISION_COLOR  # Hot pink when near/in collision
+            else:
+                colors[i] = self.SAFE_COLOR  # Light blue when safe
+        
+        return colors
     
     # ========================================================================
     # GROUP CENTROID RENDERING (HOT PINK)

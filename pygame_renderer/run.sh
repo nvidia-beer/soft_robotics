@@ -1,14 +1,12 @@
 #!/bin/bash
 # =============================================================================
-# Test script for Pygame Renderer
+# Test script for Pygame Renderer - Circle Soft Body
 # =============================================================================
 #
-# Tests the Renderer class with all visualization features:
+# Tests the Renderer class with circle soft body visualization:
 # 1. FEM / Spring strain legends
 # 2. Tension visualization (springs + FEM colored by strain gradient)
-# 3. Groups rendered in hot pink
-# 4. External forces rendered by arrows
-# 5. Optional SDF background (brown=collision, white=passable)
+# 3. Optional SDF background (brown=collision, white=passable)
 #
 # Usage:
 #   ./run.sh              # Run interactive demo with defaults
@@ -27,10 +25,8 @@ PURPLE='\033[0;35m'
 NC='\033[0m' # No Color
 
 echo "========================================================================"
-echo -e "${PURPLE}Pygame Renderer Test${NC}"
+echo -e "${PURPLE}Pygame Renderer Test - Circle Soft Body${NC}"
 echo "========================================================================"
-echo ""
-echo "Tests the Renderer class with all visualization features."
 echo ""
 
 # Get script directory and project root
@@ -40,7 +36,7 @@ IMAGE_NAME="spring-mass-nengo"
 
 # Configuration
 echo -e "${BLUE}Configuration:${NC}"
-echo "  1) Quick test (defaults: 3x6 grid, FEM enabled)"
+echo "  1) Quick test (defaults)"
 echo "  2) Custom configuration"
 echo ""
 read -p "Select [1/2] (default: 1): " config_choice
@@ -49,18 +45,20 @@ config_choice=${config_choice:-1}
 if [ "$config_choice" == "2" ]; then
     # Custom configuration
     echo ""
-    echo -e "${BLUE}Grid Configuration:${NC}"
-    read -p "Grid rows (height, default: 3): " grid_rows
-    grid_rows=${grid_rows:-3}
-    read -p "Grid cols (width, default: 6): " grid_cols
-    grid_cols=${grid_cols:-6}
+    echo -e "${BLUE}Circle Configuration:${NC}"
+    read -p "Circle radius (default: 0.5): " radius
+    radius=${radius:-0.5}
+    read -p "Number of boundary points (default: 20): " num_boundary
+    num_boundary=${num_boundary:-20}
+    read -p "Number of interior rings (default: 3): " num_rings
+    num_rings=${num_rings:-3}
     
     echo ""
     echo -e "${BLUE}Visualization Options:${NC}"
     read -p "Enable FEM triangles? [y/n] (default: y): " use_fem
     use_fem=${use_fem:-y}
     
-    read -p "Show SDF background + collision (brown=walls)? [y/n] (default: y): " use_sdf
+    read -p "Show SDF background + collision? [y/n] (default: y): " use_sdf
     use_sdf=${use_sdf:-y}
     
     echo ""
@@ -82,8 +80,9 @@ if [ "$config_choice" == "2" ]; then
     duration=${duration:-30}
 else
     # Quick defaults
-    grid_rows=3
-    grid_cols=6
+    radius=0.5
+    num_boundary=20
+    num_rings=3
     use_fem="y"
     use_sdf="y"
     winwidth=1000
@@ -105,26 +104,22 @@ fi
 echo ""
 echo "========================================================================"
 echo -e "${GREEN}Configuration Summary:${NC}"
-echo "  Grid: ${grid_cols}x${grid_rows} (wide x tall)"
+echo "  Circle: radius=${radius}, boundary=${num_boundary}, rings=${num_rings}"
 echo "  FEM: $([ "$use_fem" == "y" ] && echo "Enabled" || echo "Disabled")"
-echo "  SDF + Collision: $([ "$use_sdf" == "y" ] && echo "Enabled (brown walls)" || echo "Disabled")"
+echo "  SDF + Collision: $([ "$use_sdf" == "y" ] && echo "Enabled" || echo "Disabled")"
 echo "  Window: ${winwidth}×${winheight}"
 echo "  Bounding box: ${boxsize}"
 echo "  Device: ${device}"
 echo "  Duration: ${duration}s"
 echo ""
 echo -e "${CYAN}Features being tested:${NC}"
+echo "  ✓ Circle soft body mesh"
 echo "  ✓ FEM triangles with strain coloring (blue→cyan→green)"
 echo "  ✓ Springs with strain coloring (orange→yellow→red)"
-echo "  ✓ Group centroids (hot pink circles with labels)"
-echo "  ✓ Force arrows with magnitude gradient"
 echo "  ✓ Strain legends (Spring + FEM)"
-echo "  ✓ Force legend"
-echo "  ✓ Group forces matrix display"
 if [ "$use_sdf" == "y" ]; then
     echo "  ✓ SDF background (brown=walls, white=passable)"
-    echo "  ✓ Collision with walls (particles bounce off brown areas)"
-    echo "  ✓ Collision debug (blue=safe, cyan=near, green=colliding)"
+    echo "  ✓ Collision with walls"
 fi
 echo "========================================================================"
 echo ""
@@ -133,8 +128,9 @@ echo ""
 
 # Build command
 CMD="python test_renderer.py \
-    --rows ${grid_rows} \
-    --cols ${grid_cols} \
+    --radius ${radius} \
+    --num-boundary ${num_boundary} \
+    --num-rings ${num_rings} \
     --window-width ${winwidth} \
     --window-height ${winheight} \
     --boxsize ${boxsize} \
@@ -148,7 +144,6 @@ echo -e "${CYAN}Controls:${NC}"
 echo "  Q/ESC  - Quit"
 echo "  SPACE  - Pause/Resume"
 echo "  R      - Reset"
-echo "  F      - Apply random force pulse to groups"
 echo ""
 
 # Allow X11 connections from Docker

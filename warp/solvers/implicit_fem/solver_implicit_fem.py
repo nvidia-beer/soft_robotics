@@ -378,8 +378,9 @@ class SolverImplicitFEM(SolverBase):
             device=model.device
         )
         
-        # Update strains
-        self._update_and_normalize_strains()
+        # Update strains (FEM solver always has FEM triangles)
+        has_fem = hasattr(model, 'tri_count') and model.tri_count > 0
+        self._update_and_normalize_strains(update_fem=has_fem)
         
         return state_out
 

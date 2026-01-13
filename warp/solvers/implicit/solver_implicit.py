@@ -359,7 +359,9 @@ class SolverImplicit(SolverBase):
             )
         
         # Update adaptive scale and normalize strains (base class method)
-        self._update_and_normalize_strains()
+        # Pass update_fem=True since SolverImplicit evaluates FEM forces
+        has_fem = hasattr(model, 'tri_count') and model.tri_count > 0
+        self._update_and_normalize_strains(update_fem=has_fem)
         
         return state_out
 

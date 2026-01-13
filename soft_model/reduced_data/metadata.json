@@ -1,0 +1,13 @@
+{
+  "n_particles": 54,
+  "n_modes": 2,
+  "tolerance": 0.05,
+  "n_snapshots": 1200,
+  "energy_captured": 0.9981954686440733,
+  "model": {
+    "radius": 0.5,
+    "num_boundary": 20,
+    "num_rings": 3,
+    "boxsize": 2.5
+  }
+}
