@@ -423,9 +423,9 @@ class SpringMassEnv(gym.Env):
         if not (hasattr(self.model, 'tri_count') and self.model.tri_count > 0 and self.tri_indices_np is not None):
             return
         
-        # Only draw FEM if using implicit solver (semi-implicit doesn't compute FEM)
+        # Only draw FEM if using implicit solver or VBD (semi-implicit doesn't compute FEM)
         solver_name = self.solver.__class__.__name__
-        solver_uses_fem = solver_name in ("SolverImplicit", "SolverImplicitFEM")
+        solver_uses_fem = solver_name in ("SolverImplicit", "SolverImplicitFEM", "SolverVBD")
         
         if not solver_uses_fem:
             return  # Skip drawing FEM triangles for non-FEM solvers
@@ -546,7 +546,9 @@ class SpringMassEnv(gym.Env):
         """Get solver display name"""
         solver_name = self.solver.__class__.__name__
         
-        if solver_name == "SolverImplicitFEM":
+        if solver_name == "SolverVBD":
+            return "Solver: VBD (Vertex Block Descent)"
+        elif solver_name == "SolverImplicitFEM":
             has_fem = hasattr(self.model, 'tri_count') and self.model.tri_count > 0
             return "Solver: Fully Implicit FEM" if has_fem else "Solver: Implicit FEM"
         elif solver_name == "SolverImplicit":
@@ -561,9 +563,9 @@ class SpringMassEnv(gym.Env):
     
     def _draw_legends(self, canvas):
         """Draw strain legends (top right corner)"""
-        # Only show FEM legend if using implicit solver
+        # Only show FEM legend if using implicit solver or VBD
         solver_name = self.solver.__class__.__name__
-        solver_uses_fem = solver_name in ("SolverImplicit", "SolverImplicitFEM")
+        solver_uses_fem = solver_name in ("SolverImplicit", "SolverImplicitFEM", "SolverVBD")
         
         # Get strain scales from model (computed by solver)
         spring_scale = self.model.spring_strain_scale.numpy()[0] if hasattr(self.model, 'spring_strain_scale') else 0.01

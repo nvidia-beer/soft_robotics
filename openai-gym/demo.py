@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 import argparse
 import numpy as np
 from spring_mass_env import SpringMassEnv
-from solvers import SolverImplicit, SolverImplicitFEM
+from solvers import SolverImplicit, SolverImplicitFEM, SolverVBD
 from sim import Model
 
 
@@ -26,6 +26,8 @@ def main():
                        help='Use implicit solver with FEM (unconditionally stable)')
     parser.add_argument('--implicit-fem', action='store_true',
                        help='Use FULLY implicit FEM solver (FEM stiffness in system matrix)')
+    parser.add_argument('--vbd', action='store_true',
+                       help='Use VBD solver (Vertex Block Descent - parallel GPU optimization)')
     parser.add_argument('--no-fem', action='store_true',
                        help='Disable FEM triangles (implicit solver only, spring-only simulation)')
     parser.add_argument('--no-springs', action='store_true',
@@ -77,7 +79,9 @@ def main():
     # Set default timestep based on solver
     # Fully implicit FEM can handle larger timesteps
     if args.dt is None:
-        if args.implicit_fem:
+        if args.vbd:
+            args.dt = 0.01  # VBD uses smaller timesteps for iterative convergence
+        elif args.implicit_fem:
             args.dt = 0.05  # Fully implicit FEM handles larger timesteps
         elif args.implicit:
             args.dt = 0.05  # Implicit solver
@@ -87,8 +91,8 @@ def main():
     # Create environment (uses Model + Solver internally)
     render_mode = None if args.no_render else 'human'
     
-    # FEM only makes sense with implicit solver (semi-implicit doesn't use it)
-    use_fem = (args.implicit or args.implicit_fem) and not args.no_fem
+    # FEM only makes sense with implicit solver or VBD (semi-implicit doesn't use it)
+    use_fem = (args.implicit or args.implicit_fem or args.vbd) and not args.no_fem
     
     # Use spring parameters from command line
     spring_coeff = args.spring_stiffness
@@ -157,8 +161,8 @@ def main():
         env._profile_physics = True
         print("\n🔍 Physics profiling ENABLED (will show GPU/CPU timing every 100 steps)\n")
     
-    # Replace solver with implicit if requested
-    if args.implicit or args.implicit_fem:
+    # Replace solver with implicit or VBD if requested
+    if args.implicit or args.implicit_fem or args.vbd:
         # Update FEM parameters if FEM is enabled
         if use_fem and hasattr(env.model, 'tri_materials') and env.model.tri_materials is not None:
             # Recalculate Lame parameters from user-provided values
@@ -174,7 +178,29 @@ def main():
             env.model.tri_materials.fill_(wp.vec3(k_mu, k_lambda, k_damp))
             print(f"  FEM params: E={E}, nu={nu}, damp={k_damp}")
         
-        if args.implicit_fem:
+        if args.vbd:
+            print("\n🔷 Switching to VBD solver (Vertex Block Descent)...")
+            print("   (GPU-parallel optimization-based implicit integration)")
+            # Match implicit FEM: use particle_mass=1.0 equivalent
+            # VBD computes mass = density * area, so we need to scale density
+            # to get similar effective mass per particle
+            avg_area = env.model.tri_areas.numpy().mean() if hasattr(env.model, 'tri_areas') else 0.02
+            avg_incident = 6  # typical interior vertex has ~6 incident triangles
+            # effective_mass_per_particle ≈ avg_incident * (density * avg_area / 3)
+            # To match implicit's mass=1.0: density = 3 / (avg_incident * avg_area)
+            target_mass = 1.0  # Same as implicit solver default
+            vbd_density = (3.0 * target_mass) / (avg_incident * avg_area)
+            
+            env.solver = SolverVBD(
+                env.model,
+                dt=args.dt,
+                dx_tol=1e-5,
+                max_iter=20,
+                damping_coefficient=1.0,  # Use material k_damp directly
+                density=vbd_density
+            )
+            print(f"   Density: {vbd_density:.2f} (target mass ~{target_mass}), max_iter: 20")
+        elif args.implicit_fem:
             print("\n⚡⚡ Switching to FULLY IMPLICIT FEM solver...")
             print("   (FEM tangent stiffness included in system matrix)")
             env.solver = SolverImplicitFEM(
@@ -199,7 +225,9 @@ def main():
                 tolerance=1e-3      # Slightly looser tolerance for speed
             )
     
-    if args.implicit_fem:
+    if args.vbd:
+        solver_name = "VBD (Vertex Block Descent - GPU Parallel)"
+    elif args.implicit_fem:
         solver_name = "Fully Implicit FEM (K_fem in system matrix)"
     elif args.implicit:
         solver_name = "Implicit (Unconditionally Stable)"
@@ -234,7 +262,14 @@ def main():
     print("\nArchitecture:")
     print("  - sim.Model: Static system description")
     print("  - sim.State: Time-varying state")
-    if args.implicit_fem:
+    if args.vbd:
+        print("  - solvers.SolverVBD: Vertex Block Descent 🔷")
+        print("  - GPU-parallel optimization (graph coloring)")
+        print("  - Per-vertex 2x2 Newton solve (no global assembly)")
+        print("  - Near-linear scaling with mesh size")
+        print("  - Stable Neo-Hookean material model")
+        print(f"  - Using dt={args.dt}s (iterative convergence)")
+    elif args.implicit_fem:
         print("  - solvers.SolverImplicitFEM: Fully implicit FEM ⚡⚡")
         print("  - FEM tangent stiffness in system matrix: A = M - hD - h²(K_spring + K_fem)")
         print("  - Better stability for stiff FEM materials")
@@ -255,7 +290,15 @@ def main():
     obs, info = env.reset(seed=42)
     print(f"\nInitial energy: {info['total_energy']:.4f}")
     
-    if args.implicit_fem:
+    if args.vbd:
+        print("\n💡 VBD (Vertex Block Descent) solver features:")
+        print(f"   ✓ Using dt={args.dt}s")
+        print("   ✓ GPU-parallel vertex updates via graph coloring")
+        print("   ✓ No global linear system assembly")
+        print("   ✓ Near-linear scaling with mesh size")
+        print("   ✓ Based on Chen et al. 2024 (SIGGRAPH)")
+        print("   ✓ Stable Neo-Hookean material model")
+    elif args.implicit_fem:
         print("\n💡 Fully Implicit FEM solver features:")
         print(f"   ✓ Using dt={args.dt}s")
         print("   ✓ FEM stiffness included in system matrix")
@@ -318,7 +361,9 @@ def main():
     print("Simulation complete!")
     print(f"Simulated time: {info['time']:.2f}s")
     print(f"Final energy: {info['total_energy']:.4f}")
-    if args.implicit_fem:
+    if args.vbd:
+        print("✓ VBD solver completed successfully!")
+    elif args.implicit_fem:
         print("✓ Fully Implicit FEM solver completed successfully!")
     elif args.implicit:
         print("✓ Implicit solver completed successfully!")

@@ -76,8 +76,9 @@ echo -e "${BLUE}Solver Configuration:${NC}"
 echo "  1) Semi-Implicit (springs only, fastest)"
 echo "  2) Implicit (springs implicit, FEM explicit)"
 echo "  3) Fully Implicit FEM (K_fem in system matrix, most stable)"
+echo "  4) VBD (Vertex Block Descent - GPU parallel optimization)"
 echo ""
-read -p "Enter choice [1-3] (default: 2): " solver_choice
+read -p "Enter choice [1-4] (default: 2): " solver_choice
 solver_choice=${solver_choice:-2}
 
 SOLVER_FLAG=""
@@ -93,6 +94,10 @@ case $solver_choice in
         SOLVER_FLAG="--implicit-fem"
         echo "  Solver: Fully Implicit FEM ⚡⚡ (K_fem in system matrix)"
         ;;
+    4)
+        SOLVER_FLAG="--vbd"
+        echo "  Solver: VBD 🔷 (GPU-parallel Vertex Block Descent)"
+        ;;
     *)
         SOLVER_FLAG="--implicit"
         echo "  Using default: Implicit solver"
@@ -100,7 +105,7 @@ case $solver_choice in
 esac
 
 use_implicit="n"
-if [ "$solver_choice" == "2" ] || [ "$solver_choice" == "3" ]; then
+if [ "$solver_choice" == "2" ] || [ "$solver_choice" == "3" ] || [ "$solver_choice" == "4" ]; then
     use_implicit="y"
 fi
 
@@ -170,6 +175,7 @@ case $solver_choice in
     1) echo "  Solver: Semi-Implicit (springs only)" ;;
     2) echo "  Solver: Implicit (springs implicit, FEM explicit)" ;;
     3) echo "  Solver: Fully Implicit FEM (K_fem in system matrix)" ;;
+    4) echo "  Solver: VBD (Vertex Block Descent - GPU parallel)" ;;
 esac
 echo "  Time step: ${dt}"
 echo "  Steps: ${steps}"

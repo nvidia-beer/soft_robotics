@@ -7,6 +7,7 @@
 from .semi_implicit import SolverSemiImplicit
 from .implicit import SolverImplicit
 from .implicit_fem import SolverImplicitFEM
+from .vbd import SolverVBD
 from .solver import SolverBase
 
 __all__ = [
@@ -14,5 +15,6 @@ __all__ = [
     "SolverSemiImplicit",
     "SolverImplicit",
     "SolverImplicitFEM",
+    "SolverVBD",
 ]
 
