@@ -33,7 +33,7 @@ from renderer import Renderer
 try:
     import warp as wp
     from spring_mass_env import SpringMassEnv
-    from sim import Model
+    from models import CircleModel
     from solvers import SolverImplicit
     PHYSICS_AVAILABLE = True
 except ImportError as e:
@@ -87,7 +87,7 @@ def run_with_physics(args):
     print(f"   Radius: {args.radius}")
     print(f"   Boundary points: {args.num_boundary}")
     print(f"   Interior rings: {args.num_rings}")
-    model = Model.from_circle(
+    model = CircleModel(
         radius=args.radius,
         num_boundary=args.num_boundary,
         num_rings=args.num_rings,
@@ -389,7 +389,7 @@ def run_visualization_only(args):
         boxsize=args.boxsize,
     )
     
-    # Generate circle mesh data (similar to Model.from_circle but numpy only)
+    # Generate circle mesh data (similar to CircleModel but numpy only)
     from scipy.spatial import Delaunay
     
     radius = args.radius

@@ -12,7 +12,8 @@ import pygame
 import warp as wp
 import time
 
-from sim import Model, State
+from sim import State
+from models import GridModel
 from solvers import SolverSemiImplicit
 from pygame_renderer import Renderer
 
@@ -119,8 +120,8 @@ class SpringMassEnv(gym.Env):
             # Calculate particle spacing
             particle_spacing = 1.0 / (5 - 1)  # Reference spacing from N=5
             
-            # Create model using grid builder
-            self.model = Model.from_grid(
+            # Create model using GridModel
+            self.model = GridModel(
                 rows=rows, cols=cols, spacing=particle_spacing, 
                 device=device, boxsize=boxsize, 
                 with_fem=with_fem, with_springs=with_springs

@@ -26,7 +26,6 @@ import time
 import nengo
 
 from spring_mass_env import SpringMassEnv
-from sim import Model
 from balloon_forces import BalloonForces
 
 

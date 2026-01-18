@@ -14,7 +14,7 @@ Usage:
     )
 
 Output is used by:
-    - Model.from_tessellation() in warp/sim/model.py
+    - TessellationModel in warp/models/tessellation.py
     - openai-gym/demo.py with --tessellation flag
 """
 

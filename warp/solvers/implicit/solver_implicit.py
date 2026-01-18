@@ -57,7 +57,7 @@ class SolverImplicit(SolverBase):
         ✗ Cons: Still requires symmetric positive definite matrices
     
     Example:
-        >>> model = Model.from_grid(rows=10, cols=10, spacing=0.2)
+        >>> model = GridModel(rows=10, cols=10, spacing=0.2)
         >>> solver = SolverImplicit(model, dt=0.01, solver_type='bicgstab')
         >>> state_in = model.state()
         >>> state_out = model.state()

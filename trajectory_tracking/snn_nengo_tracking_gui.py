@@ -82,7 +82,7 @@ print()
 print("Creating Tracking Environment (no gravity)...")
 env = TrackingEnv(
     render_mode='human',
-    N=N,
+    rows=N, cols=N,
     dt=DT,
     spring_stiffness=40.0,
     spring_damping=0.5,

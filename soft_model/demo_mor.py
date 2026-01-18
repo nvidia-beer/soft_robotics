@@ -33,7 +33,7 @@ import time
 
 # Physics
 import warp as wp
-from sim import Model
+from models import CircleModel
 from solvers import SolverImplicit
 
 # MOR components
@@ -191,7 +191,7 @@ def train(args):
     wp.init()
     
     # Create model
-    model = Model.from_circle(
+    model = CircleModel(
         radius=args.radius,
         num_boundary=args.num_boundary,
         num_rings=args.num_rings,
@@ -199,13 +199,13 @@ def train(args):
         boxsize=args.boxsize,
     )
     
-    # Use SAME physics as test_renderer.py (Model.from_circle defaults)
+    # Use SAME physics as test_renderer.py (CircleModel defaults)
     # test_renderer.py passes model to SpringMassEnv, which IGNORES spring_coeff/damping/gravity
-    # So the actual physics are the defaults from Model.from_circle():
+    # So the actual physics are the defaults from CircleModel():
     # - spring_stiffness = 40.0
     # - spring_damping = 0.5
     # - gravity = -0.1
-    # DO NOT OVERRIDE THESE - they're already set correctly by from_circle()
+    # DO NOT OVERRIDE THESE - they're already set correctly by CircleModel()
     
     print(f"\n  Model: {model.particle_count} particles, {model.spring_count} springs")
     print(f"  Physics: stiffness=40 (default), damping=0.5 (default), gravity=-0.1 (default)")
@@ -403,7 +403,7 @@ def run_reduced(args):
     print(f"    Particles: {reduced_data['n_particles']}")
     
     # Create model (must match training)
-    model = Model.from_circle(
+    model = CircleModel(
         radius=args.radius,
         num_boundary=args.num_boundary,
         num_rings=args.num_rings,
@@ -411,8 +411,8 @@ def run_reduced(args):
         boxsize=args.boxsize,
     )
     
-    # Use SAME physics as test_renderer.py (Model.from_circle defaults)
-    # DO NOT override - defaults are already set correctly by from_circle()
+    # Use SAME physics as test_renderer.py (CircleModel defaults)
+    # DO NOT override - defaults are already set correctly by CircleModel()
     
     # Create reduced solver
     solver = SolverReduced(
@@ -554,7 +554,7 @@ def compare(args):
     reduced_data = load_reduced_model(args.output_dir)
     
     # Create model
-    model = Model.from_circle(
+    model = CircleModel(
         radius=args.radius,
         num_boundary=args.num_boundary,
         num_rings=args.num_rings,
@@ -562,8 +562,8 @@ def compare(args):
         boxsize=args.boxsize,
     )
     
-    # Use SAME physics as test_renderer.py (Model.from_circle defaults)
-    # DO NOT override - defaults are already set correctly by from_circle()
+    # Use SAME physics as test_renderer.py (CircleModel defaults)
+    # DO NOT override - defaults are already set correctly by CircleModel()
     
     n_steps = 500
     warmup = 50

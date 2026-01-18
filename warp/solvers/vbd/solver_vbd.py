@@ -62,7 +62,7 @@ class SolverVBD(SolverBase):
     3. Update velocities: v = (x - x_prev) / dt
     
     Example:
-        >>> model = Model.from_grid(rows=10, cols=10, spacing=0.2, with_fem=True)
+        >>> model = GridModel(rows=10, cols=10, spacing=0.2, with_fem=True)
         >>> solver = SolverVBD(model, dt=0.01, dx_tol=1e-6, max_iter=50)
         >>> state_in = model.state()
         >>> state_out = model.state()
@@ -112,7 +112,7 @@ class SolverVBD(SolverBase):
         
         # Check for FEM triangles
         if not hasattr(model, 'tri_count') or model.tri_count == 0:
-            raise ValueError("VBD solver requires FEM triangles. Use with_fem=True in Model.from_grid()")
+            raise ValueError("VBD solver requires FEM triangles. Use with_fem=True in GridModel()")
         
         n_vertices = model.particle_count
         n_triangles = model.tri_count

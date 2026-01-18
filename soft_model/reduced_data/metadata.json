@@ -3,7 +3,7 @@
   "n_modes": 2,
   "tolerance": 0.05,
   "n_snapshots": 1200,
-  "energy_captured": 0.9981954686440733,
+  "energy_captured": 0.9981973048204017,
   "model": {
     "radius": 0.5,
     "num_boundary": 20,

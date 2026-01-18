@@ -28,7 +28,6 @@ import argparse
 import time
 
 from spring_mass_env import SpringMassEnv
-from sim import Model
 from cpg import HopfCPG
 from balloon_forces import BalloonForces
 from pygame_renderer import Renderer

@@ -35,11 +35,11 @@ class TrainingLoop:
     
     Example:
         >>> from soft_model import TrainingLoop
-        >>> from warp.sim import Model
+        >>> from warp.models import GridModel
         >>> from warp.solvers import SolverImplicit
         >>> 
         >>> # Create model and solver
-        >>> model = Model.from_grid(rows=10, cols=10)
+        >>> model = GridModel(rows=10, cols=10)
         >>> solver = SolverImplicit(model)
         >>> 
         >>> # Training

@@ -123,14 +123,14 @@ The solver supports four iterative methods:
 
 ```python
 import warp as wp
-from sim import Model
+from models import GridModel
 from solvers import SolverImplicit
 
 # Initialize
 wp.init()
 
 # Create model
-model = Model.from_grid(rows=10, cols=10, spacing=0.2, device='cuda')
+model = GridModel(rows=10, cols=10, spacing=0.2, device='cuda')
 
 # Create implicit solver
 solver = SolverImplicit(
@@ -212,10 +212,10 @@ The implicit solver integrates seamlessly with the `SpringMassEnv`:
 ```python
 from spring_mass_env import SpringMassEnv
 from solvers import SolverImplicit
-from sim import Model
+from models import GridModel
 
 # Create custom model
-model = Model.from_grid(rows=10, cols=10, spacing=0.2)
+model = GridModel(rows=10, cols=10, spacing=0.2)
 
 # Create solver
 solver = SolverImplicit(model, dt=0.01, solver_type="bicgstab")

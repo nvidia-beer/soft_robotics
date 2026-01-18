@@ -32,10 +32,10 @@ class RunningLoop:
     
     Example:
         >>> from soft_model import RunningLoop
-        >>> from warp.sim import Model
+        >>> from warp.models import GridModel
         >>> 
         >>> # Create model (same topology as training)
-        >>> model = Model.from_grid(rows=10, cols=10)
+        >>> model = GridModel(rows=10, cols=10)
         >>> 
         >>> # Create runner with pre-computed reduced data
         >>> runner = RunningLoop(model, reduced_data_dir='reduced_data/')

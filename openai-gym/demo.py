@@ -14,7 +14,7 @@ import argparse
 import numpy as np
 from spring_mass_env import SpringMassEnv
 from solvers import SolverImplicit, SolverImplicitFEM, SolverVBD
-from sim import Model
+from models import TessellationModel, CircleModel
 
 
 def main():
@@ -114,7 +114,7 @@ def main():
             tess_path = os.path.join(workspace_root, tess_path)
         
         print(f"\n📐 Loading tessellation from: {tess_path}")
-        model = Model.from_tessellation(
+        model = TessellationModel(
             json_path=tess_path,
             device=args.device,
             boxsize=args.boxsize,
@@ -126,7 +126,7 @@ def main():
         print(f"   Radius: {args.radius}")
         print(f"   Boundary points: {args.num_boundary}")
         print(f"   Interior rings: {args.num_rings}")
-        model = Model.from_circle(
+        model = CircleModel(
             radius=args.radius,
             num_boundary=args.num_boundary,
             num_rings=args.num_rings,

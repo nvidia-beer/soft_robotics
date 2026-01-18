@@ -47,7 +47,6 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 from collections import deque
 
 from spring_mass_env import SpringMassEnv
-from sim import Model
 from solvers import SolverImplicit
 from pygame_renderer import Renderer
 
@@ -246,7 +245,7 @@ class TrackingEnv(SpringMassEnv):
         )
         
         print(f"✓ TrackingEnv initialized")
-        print(f"  Grid: {N}×{N} = {self.model.particle_count} particles")
+        print(f"  Grid: {self.rows}×{self.cols} = {self.model.particle_count} particles")
         print(f"  RIGID GRID: ALL {self.num_groups} group centroids controlled")
         print(f"  Action dim: {self.action_dim} (2 per group = force per centroid)")
         print(f"  Trajectory: {trajectory_type} (A={trajectory_amplitude}, f={trajectory_frequency}Hz)")
@@ -1012,7 +1011,7 @@ if __name__ == '__main__':
     print("Testing TrackingEnv (4x4 grid, rotating rigid grid)...")
     env = TrackingEnv(
         render_mode='human',
-        N=4,  # 4x4 grid = 9 groups
+        rows=4, cols=4,  # 4x4 grid = 9 groups
         dt=0.01,
         trajectory_amplitude=0.5,
         trajectory_frequency=0.3,

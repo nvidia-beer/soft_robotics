@@ -55,8 +55,7 @@ class SolverImplicitFEM(SolverBase):
     linearization of the Neo-Hookean stress tensor around current deformation.
     
     Example:
-        >>> model = Model.from_grid(rows=10, cols=10, spacing=0.2)
-        >>> # Enable FEM on model...
+        >>> model = GridModel(rows=10, cols=10, spacing=0.2, with_fem=True)
         >>> solver = SolverImplicitFEM(model, dt=0.01, solver_type='bicgstab')
         >>> state_in = model.state()
         >>> state_out = model.state()

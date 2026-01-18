@@ -151,7 +151,7 @@ echo "  5 = 16 groups"
 echo ""
 read -p "Enter grid size [2-10, default: 3]: " grid_size
 grid_size=${grid_size:-3}
-GRID_ARG="-N $grid_size"
+GRID_ARG="--grid-size $grid_size"
 
 # Simulation time selection
 echo ""
