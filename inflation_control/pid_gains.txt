@@ -1,0 +1,4 @@
+# PID gains from tuning.py
+KP=25
+KI=8.0
+KD=0.05

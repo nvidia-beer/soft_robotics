@@ -1,0 +1,4 @@
+# SNN PID gains from snn_tuning.py
+KP=4.5
+KI=1.25
+KD=0.05

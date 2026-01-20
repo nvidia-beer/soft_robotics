@@ -40,6 +40,7 @@ env/
 *.pdf
 *.jpg
 *.jpeg
+*.npz
 
 # Ignore generated PNGs but allow documentation images
 **/*.png
@@ -47,6 +48,9 @@ env/
 !pid.png
 !implicit.png
 !explicit.png
+
+# Nengo GUI config files
+*.cfg
 
 # OS
 .DS_Store
